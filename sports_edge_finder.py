@@ -58,9 +58,28 @@ MAP_WNBA = {
     "WAS": "Washington Mystics", "WSH": "Washington Mystics"
 }
 
+MAP_WORLD_CUP = {
+    "URU": "Uruguay", "ESP": "Spain",
+    "CPV": "Cape Verde", "KSA": "Saudi Arabia",
+    "EGY": "Egypt", "IRI": "Iran",
+    "NZL": "New Zealand", "BEL": "Belgium",
+    "USA": "USA", "BIH": "Bosnia and Herzegovina",
+    "NED": "Netherlands", "MAR": "Morocco",
+    "BRA": "Brazil", "JPN": "Japan",
+    "RSA": "South Africa", "CAN": "Canada",
+    "COD": "DR Congo", "UZB": "Uzbekistan",
+    "JOR": "Jordan", "ARG": "Argentina",
+    "DZA": "Algeria", "AUT": "Austria",
+    "CRO": "Croatia", "GHA": "Ghana",
+    "COL": "Colombia", "POR": "Portugal",
+    "PAN": "Panama", "ENG": "England"
+}
+
 def get_pinnacle_team_name(abbr, ticker):
     if ticker.startswith("KXWNBA"):
         return MAP_WNBA.get(abbr)
+    elif ticker.startswith(("KXWC", "KXSOCCER")):
+        return MAP_WORLD_CUP.get(abbr)
     return MAP_MLB.get(abbr)
 
 def get_pinnacle_key():
@@ -105,43 +124,25 @@ def fetch_pinnacle_mlb_data(api_key):
         return [], []
 
 def fetch_kalshi_sports_markets():
-    url = f"{BASE_URL_KALSHI}/markets?status=open&mve_filter=exclude&limit=100"
+    print("Fetching active Kalshi sports markets by series...")
+    series_tickers = [
+        "KXMLBTOTAL", "KXMLBSPREAD", "KXMLBF5TOTAL", "KXMLBF5SPREAD", "KXMLBF5",
+        "KXWNBATOTAL", "KXWNBASPREAD", "KXWNBA", "KXWCGAME"
+    ]
     markets = []
-    page = 0
-    print("Fetching active Kalshi sports markets...")
-    
-    # Prefixes we care about (MLB and WNBA)
-    prefixes = (
-        "KXMLBSPREAD", "KXMLBTOTAL", "KXMLBF5TOTAL", "KXMLBF5SPREAD", "KXMLBF5",
-        "KXWNBASPREAD", "KXWNBATOTAL", "KXWNBA"
-    )
-    
-    while True:
-        page += 1
+    for series in series_tickers:
+        url = f"{BASE_URL_KALSHI}/markets?series_ticker={series}&status=open&limit=1000"
         try:
             resp = requests.get(url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
+            page_markets = data.get("markets", [])
+            markets.extend(page_markets)
+            print(f"  Series {series}: fetched {len(page_markets)} markets.")
         except Exception as e:
-            print(f"Error fetching Kalshi page {page}: {e}")
-            break
+            print(f"  Error fetching series {series}: {e}")
             
-        page_markets = data.get("markets", [])
-        if not page_markets:
-            break
-            
-        # Filter page markets by prefixes
-        for m in page_markets:
-            ticker = m.get("ticker", "")
-            if ticker.startswith(prefixes):
-                markets.append(m)
-                
-        cursor = data.get("cursor")
-        if not cursor or page >= 25:  # Limit page requests to prevent rate limit
-            break
-        url = f"{BASE_URL_KALSHI}/markets?status=open&mve_filter=exclude&limit=100&cursor={cursor}"
-        
-    print(f"Found {len(markets)} active Kalshi MLB contracts.")
+    print(f"Found {len(markets)} active Kalshi sports contracts.")
     return markets
 
 def american_to_implied(odds):
@@ -158,22 +159,41 @@ def de_vig_two_way(odds1, odds2):
         return 0, 0
     return p1_raw / sum_p, p2_raw / sum_p
 
+def de_vig_three_way(odds1, odds2, odds3):
+    p1 = american_to_implied(odds1)
+    p2 = american_to_implied(odds2)
+    p3 = american_to_implied(odds3)
+    sum_p = p1 + p2 + p3
+    if sum_p == 0:
+        return 0, 0, 0
+    return p1 / sum_p, p2 / sum_p, p3 / sum_p
+
 def parse_kalshi_date_team(ticker):
-    # E.g. KXMLBTOTAL-26JUN271905WSHBAL-8
-    # Match pattern: KXMLB[A-Z0-9]+-(\d{2}[A-Z]{3}\d{2})(\d{4})([A-Z]{3})([A-Z]{3})
-    # Ticker format details: Prefix-YYMMMDDHHMMTEAMTEAM-Suffix
-    match = re.search(r'-(\d{2}[A-Z]{3}\d{2})(\d{4})([A-Z]{3})([A-Z]{3})', ticker)
-    if match:
-        date_str = match.group(1) # E.g. 26JUN27
-        time_str = match.group(2) # E.g. 1905
-        team1 = match.group(3)    # E.g. WSH
-        team2 = match.group(4)    # E.g. BAL
-        
-        # Parse date
+    # E.g. KXMLBTOTAL-26JUN271905WSHBAL-8 or KXWCGAME-26JUN26URUESP-URU
+    # Pattern 1 (with 4-digit time)
+    match_time = re.search(r'-(\d{2}[A-Z]{3}\d{2})(\d{4})([A-Z]{3})([A-Z]{3})', ticker)
+    if match_time:
+        date_str = match_time.group(1)
+        time_str = match_time.group(2)
+        team1 = match_time.group(3)
+        team2 = match_time.group(4)
         try:
             dt = datetime.strptime(date_str, "%y%b%d")
             formatted_date = dt.strftime("%Y-%m-%d")
             return formatted_date, team1, team2, time_str
+        except Exception:
+            pass
+            
+    # Pattern 2 (without time)
+    match_no_time = re.search(r'-(\d{2}[A-Z]{3}\d{2})([A-Z]{3})([A-Z]{3})', ticker)
+    if match_no_time:
+        date_str = match_no_time.group(1)
+        team1 = match_no_time.group(2)
+        team2 = match_no_time.group(3)
+        try:
+            dt = datetime.strptime(date_str, "%y%b%d")
+            formatted_date = dt.strftime("%Y-%m-%d")
+            return formatted_date, team1, team2, None
         except Exception:
             pass
             
@@ -252,18 +272,7 @@ def match_games(kalshi_markets, pinnacle_matchups):
                     matching_game = pg
                     break
                     
-        # Fallback: search +/- 1 day to account for timezone boundary differences
-        if not matching_game:
-            for pg in pinnacle_games:
-                teams_in_game = [pg["home_team"], pg["away_team"]]
-                if p_team1 in teams_in_game and p_team2 in teams_in_game:
-                    # Date difference within 1 day
-                    d1 = datetime.strptime(k_date, "%Y-%m-%d")
-                    d2 = datetime.strptime(pg["game_date"], "%Y-%m-%d")
-                    if abs((d1 - d2).days) <= 1:
-                        matching_game = pg
-                        break
-                        
+
         if matching_game:
             matched_markets.append({
                 "kalshi_market": km,
@@ -288,6 +297,7 @@ def find_edges(matched_markets, pinnacle_markets):
     edges = []
     
     for item in matched_markets:
+        start_idx = len(edges)
         km = item["kalshi_market"]
         pg = item["pinnacle_game"]
         mid = pg["id"]
@@ -298,6 +308,9 @@ def find_edges(matched_markets, pinnacle_markets):
             continue
             
         ticker = km["ticker"]
+        k_date, t1, t2, k_time = parse_kalshi_date_team(ticker)
+        if not t1 or not t2:
+            continue
         title = km["title"]
         yes_ask = float(km.get("yes_ask_dollars") or 0)
         no_ask = float(km.get("no_ask_dollars") or 0)
@@ -674,6 +687,62 @@ def find_edges(matched_markets, pinnacle_markets):
                             "ticker": ticker
                         })
 
+        # 6. WORLD CUP GAMES (KXWCGAME)
+        elif ticker.startswith("KXWCGAME"):
+            suffix = ticker.split("-")[-1]
+            matched_p = None
+            for pm in game_p_markets:
+                if pm.get("type") == "moneyline" and pm.get("period") == 0:
+                    matched_p = pm
+                    break
+                    
+            if matched_p:
+                prices = matched_p.get("prices", [])
+                home_odds = next((p.get("price") for p in prices if p.get("designation") == "home"), None)
+                away_odds = next((p.get("price") for p in prices if p.get("designation") == "away"), None)
+                draw_odds = next((p.get("price") for p in prices if p.get("designation") == "draw"), None)
+                
+                if home_odds is not None and away_odds is not None and draw_odds is not None:
+                    p_home, p_away, p_draw = de_vig_three_way(home_odds, away_odds, draw_odds)
+                    
+                    is_home = (suffix == t1)
+                    is_away = (suffix == t2)
+                    is_tie = (suffix == "TIE")
+                    
+                    if is_home:
+                        prob = p_home
+                    elif is_away:
+                        prob = p_away
+                    elif is_tie:
+                        prob = p_draw
+                    else:
+                        continue
+                        
+                    yes_fee = 0.0175 * yes_ask * (1.0 - yes_ask)
+                    yes_cost = yes_ask + yes_fee
+                    yes_ev = (prob * 1.0) - yes_cost
+                    yes_ev_pct = (yes_ev / yes_cost) * 100.0
+                    
+                    if yes_ev_pct > 0:
+                        b = (1.0 - yes_cost) / yes_cost
+                        kelly = 0.25 * ((prob * (b + 1.0) - 1.0) / b)
+                        edges.append({
+                            "game": f"{pg['away_team']} @ {pg['home_team']}",
+                            "market": "Match Winner",
+                            "line": suffix,
+                            "pinnacle_odds": f"Home {home_odds} / Away {away_odds} / Draw {draw_odds}",
+                            "play": f"YES ({suffix})",
+                            "kalshi_price": f"{int(yes_ask*100)}¢",
+                            "pinn_prob": f"{prob*100:.1f}%",
+                            "ev": yes_ev_pct,
+                            "kelly": max(0.0, kelly * 100.0),
+                            "ticker": ticker
+                        })
+
+        # Post-process to add date to all edges found for this matchup
+        for idx in range(start_idx, len(edges)):
+            edges[idx]["date"] = pg["game_date"]
+
     return sorted(edges, key=lambda x: x["ev"], reverse=True)
 
 def print_edge_table(edges):
@@ -681,38 +750,50 @@ def print_edge_table(edges):
         print("\nNo positive EV edges found.")
         return
         
-    print(f"\nFound {len(edges)} positive EV edges (Sorted by Net EV):\n")
-    
-    # Calculate column widths
-    w_game = max(len(e["game"]) for e in edges)
-    w_market = max(len(e["market"]) for e in edges)
-    w_line = max(len(e["line"]) for e in edges)
-    w_play = max(len(e["play"]) for e in edges)
-    w_price = 8
-    w_prob = 10
-    w_ev = 8
-    w_kelly = 10
-    
-    w_game = max(w_game, 15)
-    w_market = max(w_market, 12)
-    w_line = max(w_line, 10)
-    w_play = max(w_play, 10)
-    
-    header = f"{'Game'.ljust(w_game)} | {'Market'.ljust(w_market)} | {'Line'.ljust(w_line)} | {'Play'.ljust(w_play)} | {'Price'.ljust(w_price)} | {'Pinn Prob'.ljust(w_prob)} | {'Net EV'.ljust(w_ev)} | {'Q-Kelly'.ljust(w_kelly)}"
-    print(header)
-    print("-" * len(header))
-    
-    for e in edges[:40]: # Print top 40 edges
-        game = e["game"].ljust(w_game)
-        market = e["market"].ljust(w_market)
-        line = e["line"].ljust(w_line)
-        play = e["play"].ljust(w_play)
-        price = e["kalshi_price"].ljust(w_price)
-        prob = e["pinn_prob"].ljust(w_prob)
-        ev = f"{e['ev']:.1f}%".ljust(w_ev)
-        kelly = f"{e['kelly']:.1f}%".ljust(w_kelly)
+    # Group edges by date
+    edges_by_date = {}
+    for e in edges:
+        d = e.get("date", "Unknown Date")
+        if d not in edges_by_date:
+            edges_by_date[d] = []
+        edges_by_date[d].append(e)
         
-        print(f"{game} | {market} | {line} | {play} | {price} | {prob} | {ev} | {kelly}")
+    print(f"\nFound {len(edges)} positive EV edges:")
+    
+    for d in sorted(edges_by_date.keys()):
+        date_edges = edges_by_date[d]
+        print(f"\nTarget Date: {d} (Found {len(date_edges)} edges)")
+        
+        # Calculate column widths
+        w_game = max(len(e["game"]) for e in date_edges)
+        w_market = max(len(e["market"]) for e in date_edges)
+        w_line = max(len(e["line"]) for e in date_edges)
+        w_play = max(len(e["play"]) for e in date_edges)
+        w_price = 8
+        w_prob = 10
+        w_ev = 8
+        w_kelly = 10
+        
+        w_game = max(w_game, 15)
+        w_market = max(w_market, 12)
+        w_line = max(w_line, 10)
+        w_play = max(w_play, 10)
+        
+        header = f"{'Game'.ljust(w_game)} | {'Market'.ljust(w_market)} | {'Line'.ljust(w_line)} | {'Play'.ljust(w_play)} | {'Price'.ljust(w_price)} | {'Pinn Prob'.ljust(w_prob)} | {'Net EV'.ljust(w_ev)} | {'Q-Kelly'.ljust(w_kelly)}"
+        print(header)
+        print("-" * len(header))
+        
+        for e in date_edges[:40]: # Print top 40 edges per date
+            game = e["game"].ljust(w_game)
+            market = e["market"].ljust(w_market)
+            line = e["line"].ljust(w_line)
+            play = e["play"].ljust(w_play)
+            price = e["kalshi_price"].ljust(w_price)
+            prob = e["pinn_prob"].ljust(w_prob)
+            ev = f"{e['ev']:.1f}%".ljust(w_ev)
+            kelly = f"{e['kelly']:.1f}%".ljust(w_kelly)
+            
+            print(f"{game} | {market} | {line} | {play} | {price} | {prob} | {ev} | {kelly}")
 
 def run_sports_edge_finder():
     api_key = get_pinnacle_key()
@@ -747,9 +828,27 @@ def run_sports_edge_finder():
     except Exception as e:
         print(f"Error fetching WNBA: {e}")
         
+    # 2b. Fetch Pinnacle World Cup (League 2686)
+    print("Fetching World Cup matchups from Pinnacle...")
+    wc_matchups_url = "https://guest.api.arcadia.pinnacle.com/0.1/leagues/2686/matchups?brandId=0"
+    wc_markets_url = "https://guest.api.arcadia.pinnacle.com/0.1/leagues/2686/markets/straight"
+    
+    pinn_matchups_wc, pinn_markets_wc = [], []
+    try:
+        wc_m_resp = requests.get(wc_matchups_url, headers=headers, timeout=10)
+        if wc_m_resp.status_code == 200:
+            pinn_matchups_wc = wc_m_resp.json()
+            print(f"Fetched {len(pinn_matchups_wc)} World Cup matchups.")
+            wc_mk_resp = requests.get(wc_markets_url, headers=headers, timeout=10)
+            if wc_mk_resp.status_code == 200:
+                pinn_markets_wc = wc_mk_resp.json()
+                print(f"Fetched {len(pinn_markets_wc)} World Cup straight markets.")
+    except Exception as e:
+        print(f"Error fetching World Cup: {e}")
+        
     # Combine Pinnacle matchups and markets
-    all_pinn_matchups = pinn_matchups_mlb + pinn_matchups_wnba
-    all_pinn_markets = pinn_markets_mlb + pinn_markets_wnba
+    all_pinn_matchups = pinn_matchups_mlb + pinn_matchups_wnba + pinn_matchups_wc
+    all_pinn_markets = pinn_markets_mlb + pinn_markets_wnba + pinn_markets_wc
     
     # 3. Fetch Kalshi
     kalshi_markets = fetch_kalshi_sports_markets()

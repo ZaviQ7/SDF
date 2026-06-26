@@ -4,22 +4,19 @@ Use this file to log and track your +EV trades, expected probabilities, and actu
 
 ## Active Weather Trades Log (Targeting June 26, 2026)
 
-| Target Date | Market & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Jun 26, 2026 | **Philly High Temp**<br>`KXHIGHPHIL-26JUN26` | **Warm Side Sweep**<br>• `89-90 YES` @ 27¢<br>• `91-92 YES` @ 9¢<br>• `93+ YES` @ 4¢ | 12 | $4.80 + $0.36 fee<br>**($5.16 total)** | 82.6% | +$4.74<br>(85% ROI)<br>*(fees inc.)* | $12.00 | **Open** / *Pending* |
-| Jun 26, 2026 | **Miami High Temp**<br>`KXHIGHMIA-26JUN26` | **Buy NO** on `92-93` @ 42¢ | 6 | $2.52 + $0.06 fee<br>**($2.58 total)** | 62.8% | +$1.20<br>(47% ROI)<br>*(fees inc.)* | $6.00 | **Open** / *Pending* |
-| Jun 26, 2026 | **Austin High Temp**<br>`KXHIGHAUS-26JUN26` | **Buy YES** on `98-99` @ 6¢ | 15 | $0.90 + $0.15 fee<br>**($1.05 total)** | 18.7% | +$1.80<br>(194% ROI)<br>*(fees inc.)* | $15.00 | **Open** / *Pending* |
+*No active weather trades match the filter criteria (EV > 2%, True Prob 50% - 60%, Target Date: June 26).*
 
 ---
 
-## Active Sports Trades Log (Targeting June 27, 2026)
+## Active Sports Trades Log (Targeting June 26, 2026)
 
-*Model plays derived using Pinnacle as source of truth. Sized using Quarter Kelly on $30 bankroll.*
+*Model plays derived using Pinnacle as source of truth. Filtered for: Target Date = June 26 (Today), Net EV > 2%, and Pinnacle Probability between 50% and 60%.*
 
 | Target Date | Game & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Jun 27, 2026 | **Yankees @ Red Sox**<br>`KXMLBF5TOTAL-26...` | **Buy YES** Over 3.5 F5 Runs @ 44¢ | 6 | $2.64 + $0.03 fee<br>**($2.67 total)** | 64.4% | +$1.20<br>(45% ROI)<br>*(fees inc.)* | $6.00 | **Open** / *Pending* |
-| Jun 27, 2026 | **Reds @ Pirates**<br>`KXMLBSPREAD-26...` | **Buy YES** Pirates -1.5 Run Line @ 33¢ | 3 | $0.99 + $0.01 fee<br>**($1.00 total)** | 43.6% | +$0.31<br>(31% ROI)<br>*(fees inc.)* | $3.00 | **Open** / *Pending* |
+| Jun 26, 2026 | **Rangers @ Blue Jays**<br>`KXMLBF5TOTAL-26JUN261907TEXTOR-5` | **Buy NO** Under 4.5 F5 Runs @ 50¢ | 1 | $0.50 + $0.01 fee<br>**($0.51 total)** | 51.6% | +2.3% | $1.00 | **Open** / *Pending* |
+| Jun 26, 2026 | **Atlanta Dream @ Golden State Valkyries**<br>`KXWNBAREB-26JUN26ATLGS-GSKTHORNTON5-6` | **Buy YES** Kayla Thornton 6+ Rebounds @ 48¢ | 1 | $0.48 + $0.01 fee<br>**($0.49 total)** | 50.4% | +4.1% | $1.00 | **Open** / *Pending* |
+| Jun 26, 2026 | **Cape Verde vs Saudi Arabia**<br>`KXWCTOTAL-26JUN26CPVKSA-3` | **Buy NO** Under 2.5 Goals @ 55¢ | 1 | $0.55 + $0.01 fee<br>**($0.56 total)** | 56.8% | +2.5% | $1.00 | **Open** / *Pending* |
 
 *Note: Total cost and expected values include Kalshi's Maker fees (1.75% of contract value).*
 
@@ -27,7 +24,7 @@ Use this file to log and track your +EV trades, expected probabilities, and actu
 
 ## Historical Performance Summary
 
-*   **Total Risked Capital:** $12.46
-*   **Total Expected Value (Edge):** +$9.25
+*   **Total Risked Capital:** $1.56
+*   **Total Expected Value (Edge):** +$0.05
 *   **Actual Payout / Return:** *Pending*
 *   **Net Profit:** *Pending*

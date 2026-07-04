@@ -62,3 +62,12 @@ cities:
   name: Boston
   nws_station_id: KBOS
   timezone: America/New_York
+- active: true
+  code: NY
+  kalshi_market_prefix: KXHIGHNY
+  kalshi_market_prefix_low: KXLOWNY
+  lat: 40.7829
+  lon: -73.9654
+  name: New York
+  nws_station_id: KNYC
+  timezone: America/New_York

@@ -353,24 +353,36 @@ async def run_update():
             stats = live_market_stats[ticker]
             side = "YES" if "YES" in t["play_desc"] else "NO"
             
-            current_ask = stats["yes_ask"] if side == "YES" else stats["no_ask"]
+            yes_bid = stats["yes_bid"]
+            yes_ask = stats["yes_ask"]
+            no_bid = stats["no_bid"]
+            no_ask = stats["no_ask"]
+            
+            if side == "YES":
+                current_price = yes_bid + 0.01 if (yes_bid + 0.01) < yes_ask else yes_bid
+                if current_price <= 0:
+                    current_price = 0.01
+            else:
+                current_price = no_bid + 0.01 if (no_bid + 0.01) < no_ask else no_bid
+                if current_price <= 0:
+                    current_price = 0.01
+                    
             prob_play = stats["model_prob"] if side == "YES" else (1.0 - stats["model_prob"])
             
-            if current_ask > 0:
-                current_ev = (prob_play / current_ask) - 1.0
-            else:
-                current_ev = 0.0
+            fee_unit = calculate_maker_fee(current_price, 1)
+            cost_unit = current_price + fee_unit
+            current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                 
             # Keep the trade ONLY if true prob > 53% AND EV > 0%
             if prob_play > 0.53 and current_ev > 0.0:
                 size = t["qty"]
-                cost = current_ask * size
-                fee = calculate_maker_fee(current_ask, size)
+                cost = current_price * size
+                fee = calculate_maker_fee(current_price, size)
                 total = cost + fee
                 payout = size * 1.00
                 
                 try:
-                    t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_ask*100)}¢"
+                    t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
                 except Exception:
                     pass
                 t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"

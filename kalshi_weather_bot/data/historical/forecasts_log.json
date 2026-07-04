@@ -73,14 +73,14 @@
     "date": "2026-07-05",
     "city": "PHIL",
     "temp_type": "HIGH",
-    "forecast_mean": 93.07951219512195,
+    "forecast_mean": 92.69170731707317,
     "actual": null
   },
   {
     "date": "2026-07-05",
     "city": "CHI",
     "temp_type": "HIGH",
-    "forecast_mean": 80.76756097560975,
+    "forecast_mean": 79.90195121951218,
     "actual": null
   },
   {
@@ -88,6 +88,20 @@
     "city": "MIA",
     "temp_type": "HIGH",
     "forecast_mean": 88.06414634146341,
+    "actual": null
+  },
+  {
+    "date": "2026-07-05",
+    "city": "DEN",
+    "temp_type": "HIGH",
+    "forecast_mean": 92.70838709677419,
+    "actual": null
+  },
+  {
+    "date": "2026-07-05",
+    "city": "NY",
+    "temp_type": "HIGH",
+    "forecast_mean": 84.9609756097561,
     "actual": null
   }
 ]

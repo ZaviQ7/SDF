@@ -27,17 +27,30 @@ The workspace is organized as follows:
 SDF operates under strict mathematical constraints to protect capital and maximize growth:
 
 ### 1. Expected Value (+EV) & Fee Awareness
-We only take positions where the estimated win probability ($P_{\text{win}}$) multiplied by the payout exceeds the entry price ($P_{\text{ask}}$), after incorporating Maker transaction fees (1.75%):
-$$\text{Net EV} = (P_{\text{win}} \times \$1.00) - P_{\text{ask}} - \text{Maker Fees}$$
+We only take positions where the estimated win probability multiplied by the payout exceeds the entry price, after incorporating Maker transaction fees (1.75%):
 
-We apply a strict **$>53\%$ true probability** threshold on all logged trades to avoid high-variance tail events on a small bankroll.
+```text
+Net EV = (True Probability * $1.00) - Entry Price - Maker Fees
+```
+
+We apply a strict **> 53%** true probability threshold on all logged trades to avoid high-variance tail events on a small bankroll.
 
 ### 2. Distribution Shift Modeling
 We pool **82 ensemble runs** (31 GFS + 51 ECMWF) to establish a baseline distribution, apply a 14-day rolling MOS bias-correction, and shift the mean by **40%** of the delta between the latest high-resolution HRRR hourly grids and the ensemble average:
-$$\text{Shifted Temp} = T_{\text{ensemble}} + \text{MOS Bias} + 0.4 \times (T_{\text{HRRR}} - T_{\text{mean}})$$
+
+```text
+Shifted Temperature = Ensemble Temp + MOS Bias + 0.4 * (HRRR Forecast - Ensemble Mean)
+```
 
 ### 3. Bankroll Sizing
-We size all suggested trades using a conservative **Quarter-Kelly Criterion** to control variance and protect the $30.00 bankroll while ensuring steady compounding.
+We size all suggested trades using a conservative **Quarter-Kelly Criterion** to manage variance and protect our $30.00 bankroll:
+
+```text
+      p * (b + 1) - 1
+f* = -----------------  *  0.25 (Kelly Fraction)
+             b
+```
+*(Where `p` is our model probability, and `b` is the net decimal odds payout.)*
 
 ---
 

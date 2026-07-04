@@ -593,7 +593,7 @@ async def run_update():
     
     # 7. Git commit and push
     try:
-        subprocess.run(["git", "add", edges_file_path], check=True)
+        subprocess.run(["git", "add", edges_file_path, "data/historical/"], check=True)
         status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
         if status.stdout.strip():
             subprocess.run(["git", "commit", "-m", "Add daily PnL breakdown to tracking dashboard"], check=True)

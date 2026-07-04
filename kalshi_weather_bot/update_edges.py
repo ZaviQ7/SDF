@@ -184,6 +184,16 @@ async def send_discord_report(active_trades: list):
             }]
         }
         
+    # Check if a mention (like @here, @everyone, or a user ID) is requested
+    mention = os.getenv("DISCORD_MENTION")
+    if mention:
+        if mention.isdigit():
+            payload["content"] = f"<@{mention}>"
+        elif mention.lower() in ("everyone", "here"):
+            payload["content"] = f"@{mention.lower()}"
+        else:
+            payload["content"] = mention
+            
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(webhook_url, json=payload) as resp:

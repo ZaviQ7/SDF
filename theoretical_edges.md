@@ -22,18 +22,18 @@ Use this file to log and track your +EV trades, expected probabilities, and actu
 
 | Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Jul 04, 2026 | **Miami High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KMIA.html))<br>`KXHIGHMIA-26JUL04-B92.5` | **Buy NO** 92-93° @ 51¢ | 5 | $2.55 + $0.03 fee<br>**($2.58 total)** | 99.0% | +90.4% | $5.00 | **Open** / *Pending* |
 | Jul 04, 2026 | **New York High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KNYC.html))<br>`KXHIGHNY-26JUL04-T98` | **Buy NO** <98° @ 10¢ | 10 | $1.00 + $0.02 fee<br>**($1.02 total)** | 65.9% | +498.7% | $10.00 | **Open** / *Pending* |
-| Jul 04, 2026 | **Miami High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KMIA.html))<br>`KXHIGHMIA-26JUL04-B94.5` | **Buy NO** 94-95° @ 94¢ | 4 | $3.76 + $0.01 fee<br>**($3.77 total)** | 99.0% | +4.2% | $4.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Miami High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KMIA.html))<br>`KXHIGHMIA-26JUL04-B92.5` | **Buy NO** 92-93° @ 51¢ | 5 | $2.55 + $0.03 fee<br>**($2.58 total)** | 99.0% | +90.4% | $5.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Philadelphia High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHL.html))<br>`KXHIGHPHIL-26JUL04-B101.5` | **Buy NO** 101-102° @ 48¢ | 1 | $0.48 + $0.01 fee<br>**($0.49 total)** | 75.6% | +54.3% | $1.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Austin High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KAUS.html))<br>`KXHIGHAUS-26JUL04-B99.5` | **Buy NO** 99-100° @ 53¢ | 2 | $1.06 + $0.01 fee<br>**($1.07 total)** | 81.7% | +51.3% | $2.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Denver High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KDEN.html))<br>`KXHIGHDEN-26JUL04-B89.5` | **Buy NO** 89-90° @ 49¢ | 2 | $0.98 + $0.01 fee<br>**($0.99 total)** | 75.6% | +51.2% | $2.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Chicago High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KORD.html))<br>`KXHIGHCHI-26JUL04-T85` | **Buy NO** <85° @ 52¢ | 1 | $0.52 + $0.01 fee<br>**($0.53 total)** | 64.6% | +22.0% | $1.00 | **Open** / *Pending* |
 | Jul 04, 2026 | **Chicago High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KORD.html))<br>`KXHIGHCHI-26JUL04-B87.5` | **Buy NO** 87-88° @ 73¢ | 3 | $2.19 + $0.02 fee<br>**($2.21 total)** | 86.6% | +17.0% | $3.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Miami High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KMIA.html))<br>`KXHIGHMIA-26JUL04-B94.5` | **Buy NO** 94-95° @ 94¢ | 4 | $3.76 + $0.01 fee<br>**($3.77 total)** | 99.0% | +4.2% | $4.00 | **Open** / *Pending* |
+| Jul 04, 2026 | **Philadelphia High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHL.html))<br>`KXHIGHPHIL-26JUL04-B99.5` | **Buy NO** 99-100° @ 61¢ | 2 | $1.22 + $0.01 fee<br>**($1.23 total)** | 64.6% | +4.2% | $2.00 | **Open** / *Pending* |
 | Jul 04, 2026 | **Chicago High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KORD.html))<br>`KXHIGHCHI-26JUL04-B89.5` | **Buy NO** 89-90° @ 93¢ | 3 | $2.79 + $0.01 fee<br>**($2.80 total)** | 95.1% | +1.2% | $3.00 | **Open** / *Pending* |
 | Jul 04, 2026 | **Denver High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KDEN.html))<br>`KXHIGHDEN-26JUL04-T92` | **Buy NO** >92° @ 97¢ | 3 | $2.91 + $0.01 fee<br>**($2.92 total)** | 99.0% |  +1.0% | $3.00 | **Open** / *Pending* |
 | Jul 04, 2026 | **Philadelphia High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHL.html))<br>`KXHIGHPHIL-26JUL04-B105.5` | **Buy NO** 105-106° @ 97¢ | 2 | $1.94 + $0.01 fee<br>**($1.95 total)** | 98.8% | +0.8% | $2.00 | **Open** / *Pending* |
-| Jul 04, 2026 | **Philadelphia High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHL.html))<br>`KXHIGHPHIL-26JUL04-B99.5` | **Buy NO** 99-100° @ 61¢ | 2 | $1.22 + $0.01 fee<br>**($1.23 total)** | 64.6% | +4.2% | $2.00 | **Open** / *Pending* |
-| Jul 04, 2026 | **Philadelphia High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHL.html))<br>`KXHIGHPHIL-26JUL04-B101.5` | **Buy NO** 101-102° @ 48¢ | 1 | $0.48 + $0.01 fee<br>**($0.49 total)** | 75.6% | +54.3% | $1.00 | **Open** / *Pending* |
-| Jul 04, 2026 | **Chicago High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KORD.html))<br>`KXHIGHCHI-26JUL04-T85` | **Buy NO** <85° @ 52¢ | 1 | $0.52 + $0.01 fee<br>**($0.53 total)** | 64.6% | +22.0% | $1.00 | **Open** / *Pending* |
-| Jul 04, 2026 | **Denver High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KDEN.html))<br>`KXHIGHDEN-26JUL04-B89.5` | **Buy NO** 89-90° @ 49¢ | 2 | $0.98 + $0.01 fee<br>**($0.99 total)** | 75.6% | +51.2% | $2.00 | **Open** / *Pending* |
-| Jul 04, 2026 | **Austin High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KAUS.html))<br>`KXHIGHAUS-26JUL04-B99.5` | **Buy NO** 99-100° @ 53¢ | 2 | $1.06 + $0.01 fee<br>**($1.07 total)** | 81.7% | +51.3% | $2.00 | **Open** / *Pending* |
 
 ---
 

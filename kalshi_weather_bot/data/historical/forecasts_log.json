@@ -68,5 +68,26 @@
     "temp_type": "HIGH",
     "forecast_mean": 89.21414634146343,
     "actual": null
+  },
+  {
+    "date": "2026-07-05",
+    "city": "PHIL",
+    "temp_type": "HIGH",
+    "forecast_mean": 92.88268292682928,
+    "actual": null
+  },
+  {
+    "date": "2026-07-05",
+    "city": "CHI",
+    "temp_type": "HIGH",
+    "forecast_mean": 80.92048780487806,
+    "actual": null
+  },
+  {
+    "date": "2026-07-05",
+    "city": "MIA",
+    "temp_type": "HIGH",
+    "forecast_mean": 87.88560975609757,
+    "actual": null
   }
 ]

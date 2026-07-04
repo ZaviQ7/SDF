@@ -1,36 +1,24 @@
 # Steak Dinner Fund (SDF)
 
-**Steak Dinner Fund (SDF)** is an algorithmic trading, market analysis, and scraping toolkit designed to systematically identify, calculate, and exploit mathematical edges across prediction markets, sportsbooks, and financial platforms. 
+**Steak Dinner Fund (SDF)** is an algorithmic weather trading framework designed to systematically identify, calculate, and exploit mathematical edges in prediction markets.
 
-The ultimate goal of SDF is to grow a modest trading bankroll into a "steak dinner" (and beyond) by strictly trading positive Expected Value (+EV) and risk-free arbitrage (arb) opportunities.
-
----
-
-## 🎯 Project Overview
-
-Rather than betting on gut feelings or sentiment, SDF treats markets as mathematical puzzles. The codebase contains scanners and calculators that cross-reference real-world data feeds (e.g., weather forecasts, economic nowcasts, sports statistics) with market prices to find discrepancies and mispricings.
-
-### Target Platforms
-- **Prediction Markets**: Kalshi, Polymarket, PredictIt
-- **Sportsbooks**: Major sportsbooks offering player props, game totals, and derivatives
-- **Economic Futures**: Event contracts on inflation, employment, and interest rates
+The core of the repository is a Kalshi weather trading bot that pools meteorological ensemble runs, applies bias correction, shifts the distributions using real-time NWS/HRRR forecasts, and logs optimal (+EV) trading opportunities.
 
 ---
 
-## 🛠 Current Tooling
+## 📂 Repository Structure
 
-The current suite of tools in the workspace focuses on weather market inefficiencies:
+The workspace is organized as follows:
 
-1. **[weather_ev_scanner.py](file:///c:/Users/zavie/Downloads/Kalshi/weather_ev_scanner.py)**
-   - Queries real-time National Weather Service (NWS) forecasts using latitude/longitude.
-   - Models temperature outcome distributions using a normal probability density function ($T \sim \mathcal{N}(\mu, \sigma^2)$) with continuity corrections.
-   - Identifies contracts on Kalshi with $>5\%$ Net Expected Value (+EV) after accounting for Maker fees.
-
-2. **[weather_arb_calculator.py](file:///c:/Users/zavie/Downloads/Kalshi/weather_arb_calculator.py)**
-   - Scans Kalshi order books to evaluate liquidity and depth for multi-outcome arbitrage opportunities.
-
-3. **[arbitrage_scanner.py](file:///c:/Users/zavie/Downloads/Kalshi/scratch/arbitrage_scanner.py)**
-   - Generates candidate arbitrage groups across standard Kalshi markets by checking if the sum of contract prices is $< 1.00$.
+*   **[.github/workflows/weather_bot.yml](file:///.github/workflows/weather_bot.yml)**: The GitHub Actions automation script that runs the bot on a schedule (10:00 AM & 11:00 PM EDT) and commits updates back to Git.
+*   **[theoretical_edges.md](file:///theoretical_edges.md)**: The tracking log and dashboard displaying the live running performance summary, daily PnL history, active weather trades targeting tomorrow, and settled outcomes.
+*   **[kalshi_weather_bot/](file:///kalshi_weather_bot)**: The core weather bot package containing:
+    *   **[update_edges.py](file:///kalshi_weather_bot/update_edges.py)**: The main automation script that runs the forecast model, updates open trades, queries actual observations to auto-settle expired trades, and posts a report to Discord.
+    *   **[scan_once.py](file:///kalshi_weather_bot/scan_once.py)**: A terminal-only tool to run a quick live scan and output a clean table of current +EV plays.
+    *   **[main.py](file:///kalshi_weather_bot/main.py)**: Ingests forecasts and starts the dashboard server.
+    *   **[config/](file:///kalshi_weather_bot/config)**: YAML configuration files for settings (bet sizing, API endpoints) and active cities.
+    *   **[data/historical/](file:///kalshi_weather_bot/data/historical)**: Local JSON database tracking historical forecast distributions (`forecasts_log.json`) and calculated rolling bias offsets (`bias_offsets.json`).
+    *   **[src/](file:///kalshi_weather_bot/src)**: Source package containing data downloaders (GFS, ECMWF, HRRR), probability calculators, risk management (Quarter-Kelly position sizing), and utilities.
 
 ---
 
@@ -38,14 +26,35 @@ The current suite of tools in the workspace focuses on weather market inefficien
 
 SDF operates under strict mathematical constraints to protect capital and maximize growth:
 
-### 1. The Expected Value (+EV) Formula
-We only take positions where the estimated win probability ($P_{\text{win}}$) multiplied by the payout exceeds the entry price ($P_{\text{ask}}$):
-$$\text{Net EV} = (P_{\text{win}} \times \$1.00) - P_{\text{ask}} - \text{Fees}$$
+### 1. Expected Value (+EV) & Fee Awareness
+We only take positions where the estimated win probability ($P_{\text{win}}$) multiplied by the payout exceeds the entry price ($P_{\text{ask}}$), after incorporating Maker transaction fees (1.75%):
+$$\text{Net EV} = (P_{\text{win}} \times \$1.00) - P_{\text{ask}} - \text{Maker Fees}$$
 
-### 2. Bankroll Management
-We use a conservative **Quarter Kelly Criterion** to size directional trades. This manages variance and prevents ruin while compounding edge:
-$$f^* = \frac{p(b + 1) - 1}{b}$$
-*Where $p$ is the true probability, $b$ is the net decimal odds, and we allocate $0.25 \times f^*$ of the bankroll.*
+We apply a strict **$>53\%$ true probability** threshold on all logged trades to avoid high-variance tail events on a small bankroll.
 
-### 3. Fee Awareness
-Kalshi Maker fees (1.75%) and contract rounding structures are hardcoded into our scanners to prevent trading "ghost edges" where fees eat up the entire margin.
+### 2. Distribution Shift Modeling
+We pool **82 ensemble runs** (31 GFS + 51 ECMWF) to establish a baseline distribution, apply a 14-day rolling MOS bias-correction, and shift the mean by **40%** of the delta between the latest high-resolution HRRR hourly grids and the ensemble average:
+$$\text{Shifted Temp} = T_{\text{ensemble}} + \text{MOS Bias} + 0.4 \times (T_{\text{HRRR}} - T_{\text{mean}})$$
+
+### 3. Bankroll Sizing
+We size all suggested trades using a conservative **Quarter-Kelly Criterion** to control variance and protect the $30.00 bankroll while ensuring steady compounding.
+
+---
+
+## 🚀 How to Run the Bot
+
+### Run a Local Live Scan
+To scan the books right now and output a live terminal report of all +EV opportunities:
+```bash
+cd kalshi_weather_bot
+py scan_once.py
+```
+
+### Run the Main Sync & Settle Script
+To settle yesterday's trades, refresh active edges, and push updates:
+```bash
+cd kalshi_weather_bot
+py update_edges.py
+```
+*(Optional: Set the `DISCORD_WEBHOOK_URL` environment variable to automatically post the report to your Discord server.)*
+

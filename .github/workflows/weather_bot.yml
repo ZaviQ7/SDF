@@ -1,0 +1,47 @@
+name: Run Weather Bot Schedule
+
+on:
+  schedule:
+    # 10:00 AM EDT -> 14:00 UTC
+    - cron: '0 14 * * *'
+    # 11:00 PM EDT -> 03:00 UTC (next day)
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub web UI
+
+jobs:
+  run-updater:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f kalshi_weather_bot/requirements.txt ]; then
+            pip install -r kalshi_weather_bot/requirements.txt
+          else
+            pip install aiohttp pytz pyyaml cryptography
+          fi
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Weather Bot Scan
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # If real trading gets enabled, these can be set in GitHub secrets:
+          KALSHI_API_KEY: ${{ secrets.KALSHI_API_KEY }}
+          KALSHI_PRIVATE_KEY_PATH: ${{ secrets.KALSHI_PRIVATE_KEY_PATH }}
+        run: |
+          cd kalshi_weather_bot
+          python update_edges.py

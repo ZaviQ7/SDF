@@ -1,0 +1,66 @@
+# Kalshi API Configuration
+kalshi:
+  environment: "prod"  # "demo" or "prod"
+  simulation: true     # Run simulation/dry-run using live market data!
+  api_key: ""          # Loaded dynamically from environment
+  private_key_path: "" # Loaded dynamically from environment
+  base_url: "https://demo-api.kalshi.com"
+  
+  # Rate limits (from Kalshi docs)
+  rate_limits:
+    read_budget: 100      # tokens per second
+    write_budget: 50      # tokens per second
+    burst_capacity: 200   # 2x budget
+    
+  # Trading parameters
+  trading:
+    max_position_per_market: 10   # contracts (conservative start)
+    max_total_exposure: 0.30      # 30% of bankroll
+    min_edge_threshold: 0.05      # 5% divergence required
+    max_spread_cents: 5           # Don't trade if spread > 5¢
+    order_type: "limit"           # Always limit orders
+    post_only: true               # Maker orders (lower fees)
+    time_in_force: "GTC"          # Good Till Cancelled
+    order_expiry_minutes: 30      # Cancel resting if not filled in 30m
+
+# Weather Data Sources
+weather:
+  gfs:
+    enabled: true
+    ensemble_members: 31  # GFS has 31 members
+    update_frequency_hours: 6
+    
+  ecmwf:
+    enabled: true
+    ensemble_members: 51  # ECMWF has 51 members
+    update_frequency_hours: 12
+    
+  hrrr:
+    enabled: true
+    weight: 0.4
+    
+  nws:
+    observation_url: "https://api.weather.gov/stations/{station}/observations"
+    forecast_url: "https://api.weather.gov/gridpoints/{grid}/{x},{y}/forecast"
+    
+# Risk Management
+risk:
+  bankroll: 15.00           # Starting bankroll in USD (simulated or real)
+  max_risk_per_trade: 0.10  # 10% max risk per trade
+  kelly_fraction: 0.25      # Quarter-Kelly for small bankrolls
+  daily_loss_limit: 0.20    # Stop trading if down 20% in a day
+  max_open_positions: 5
+  position_timeout_hours: 24 # Weather contracts resolve daily
+  
+# Logging
+logging:
+  level: "INFO"
+  file: "data/logs/weather_bot.log"
+  max_file_size: 10485760   # 10MB
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Dashboard Settings
+dashboard:
+  enabled: true
+  refresh_interval_seconds: 15

@@ -1,0 +1,15 @@
+# Core dependencies
+aiohttp>=3.9.0
+websockets>=12.0
+pyyaml>=6.0
+python-dotenv>=1.0
+
+# Data processing
+numpy>=1.26.0
+pandas>=2.1.0
+scipy>=1.11.0
+
+# Utilities & UI
+pytz>=2024.1
+rich>=13.7.0
+cryptography>=41.0.0

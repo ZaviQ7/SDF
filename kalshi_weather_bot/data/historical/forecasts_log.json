@@ -1,0 +1,72 @@
+[
+  {
+    "date": "2026-07-03",
+    "city": "PHIL",
+    "temp_type": "HIGH",
+    "forecast_mean": 102.88853658536584,
+    "actual": null
+  },
+  {
+    "date": "2026-07-04",
+    "city": "PHIL",
+    "temp_type": "HIGH",
+    "forecast_mean": 99.81951219512196,
+    "actual": null
+  },
+  {
+    "date": "2026-07-03",
+    "city": "CHI",
+    "temp_type": "HIGH",
+    "forecast_mean": 89.61609756097562,
+    "actual": null
+  },
+  {
+    "date": "2026-07-04",
+    "city": "CHI",
+    "temp_type": "HIGH",
+    "forecast_mean": 86.4568292682927,
+    "actual": null
+  },
+  {
+    "date": "2026-07-03",
+    "city": "DEN",
+    "temp_type": "HIGH",
+    "forecast_mean": 91.34219512195122,
+    "actual": null
+  },
+  {
+    "date": "2026-07-04",
+    "city": "DEN",
+    "temp_type": "HIGH",
+    "forecast_mean": 88.03512195121951,
+    "actual": null
+  },
+  {
+    "date": "2026-07-03",
+    "city": "AUS",
+    "temp_type": "HIGH",
+    "forecast_mean": 96.520243902439,
+    "actual": null
+  },
+  {
+    "date": "2026-07-04",
+    "city": "AUS",
+    "temp_type": "HIGH",
+    "forecast_mean": 97.25999999999999,
+    "actual": null
+  },
+  {
+    "date": "2026-07-03",
+    "city": "MIA",
+    "temp_type": "HIGH",
+    "forecast_mean": 89.44463414634146,
+    "actual": null
+  },
+  {
+    "date": "2026-07-04",
+    "city": "MIA",
+    "temp_type": "HIGH",
+    "forecast_mean": 89.21414634146343,
+    "actual": null
+  }
+]

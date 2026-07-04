@@ -276,6 +276,7 @@ async def run_update():
         
         for temp_type, prefix in scans:
             markets = await client.get_weather_markets(prefix)
+            await asyncio.sleep(1.0)  # Pacing rate limit protection
             if not markets:
                 continue
                 

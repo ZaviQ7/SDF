@@ -28,16 +28,8 @@ logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s -
 logger = logging.getLogger("updater")
 logger.setLevel(logging.INFO)
 
-# Map city names to NWS airport stations and timezones
-CITY_STATIONS = {
-    "Philadelphia": {"station": "KPHL", "timezone": "America/New_York"},
-    "Chicago": {"station": "KORD", "timezone": "America/Chicago"},
-    "Denver": {"station": "KDEN", "timezone": "America/Denver"},
-    "Austin": {"station": "KAUS", "timezone": "America/Chicago"},
-    "Miami": {"station": "KMIA", "timezone": "America/New_York"},
-    "New Orleans": {"station": "KMSY", "timezone": "America/Chicago"},
-    "Boston": {"station": "KBOS", "timezone": "America/New_York"}
-}
+# Map city names to NWS airport stations and timezones (populated dynamically from cities.yaml)
+CITY_STATIONS = {}
 
 async def fetch_nws_actual_high_low(station_id: str, target_date_str: str, timezone_str: str, temp_type: str) -> float | None:
     """Query NWS hourly observations to find yesterday's actual high/low."""
@@ -217,6 +209,13 @@ async def run_update():
     with open(cities_path, "r") as f:
         cities_data = yaml.safe_load(f)
         cities = cities_data.get("cities", [])
+        
+    # Dynamically populate city stations mapping from config
+    for c in cities:
+        CITY_STATIONS[c["name"]] = {
+            "station": c["nws_station_id"],
+            "timezone": c["timezone"]
+        }
         
     # Configure production simulation
     config['kalshi']['environment'] = 'prod'

@@ -130,6 +130,17 @@ async def main():
                     (local_now + timedelta(days=1)).strftime("%Y-%m-%d")
                 ]
                 
+                # Download forecasts once per city for each date
+                city_forecasts = {}
+                for target_date in target_dates:
+                    gfs = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
+                    await asyncio.sleep(1.0)
+                    ecmwf = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
+                    await asyncio.sleep(1.0)
+                    hrrr = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
+                    await asyncio.sleep(1.0)
+                    city_forecasts[target_date] = (gfs, ecmwf, hrrr)
+
                 # Scan both High and Low markets
                 scans = [
                     ("HIGH", city["kalshi_market_prefix"]),
@@ -164,17 +175,13 @@ async def main():
                         if not date_markets:
                             continue
                             
-                        logger.info(f"Scanning {city_name} {temp_type} for date {target_date} ({len(date_markets)} markets)")
-                        
-                        # Download GFS and ECMWF ensembles + HRRR high-res forecast
-                        gfs_forecast = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-                        ecmwf_forecast = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-                        hrrr_forecast = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
-                        
+                        gfs_forecast, ecmwf_forecast, hrrr_forecast = city_forecasts.get(target_date, (None, None, None))
                         if not gfs_forecast and not ecmwf_forecast:
                             logger.warning(f"No weather ensemble forecasts downloaded for {city_name} on {target_date}")
                             continue
                             
+                        logger.info(f"Scanning {city_name} {temp_type} for date {target_date} ({len(date_markets)} markets)")
+                        
                         # Pool forecasts and calculate distribution stats with MOS rolling bias + HRRR shift
                         bias_key = f"{city['code']}_{temp_type}"
                         bias_offset = bias_offsets.get(bias_key, 0.0)

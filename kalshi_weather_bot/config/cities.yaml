@@ -71,3 +71,57 @@ cities:
   name: New York
   nws_station_id: KNYC
   timezone: America/New_York
+- active: true
+  code: HOU
+  kalshi_market_prefix: KXHIGHTHOU
+  kalshi_market_prefix_low: KXLOWTHOU
+  lat: 29.6454
+  lon: -95.2789
+  name: Houston
+  nws_station_id: KHOU
+  timezone: America/Chicago
+- active: true
+  code: PHX
+  kalshi_market_prefix: KXHIGHTPHX
+  kalshi_market_prefix_low: KXLOWTPHX
+  lat: 33.4373
+  lon: -112.0078
+  name: Phoenix
+  nws_station_id: KPHX
+  timezone: America/Phoenix
+- active: true
+  code: ATL
+  kalshi_market_prefix: KXHIGHTATL
+  kalshi_market_prefix_low: KXLOWTATL
+  lat: 33.6407
+  lon: -84.4277
+  name: Atlanta
+  nws_station_id: KATL
+  timezone: America/New_York
+- active: true
+  code: OKC
+  kalshi_market_prefix: KXHIGHTOKC
+  kalshi_market_prefix_low: KXLOWTOKC
+  lat: 35.3931
+  lon: -97.6008
+  name: Oklahoma City
+  nws_station_id: KOKC
+  timezone: America/Chicago
+- active: true
+  code: SEA
+  kalshi_market_prefix: KXHIGHTSEA
+  kalshi_market_prefix_low: KXLOWTSEA
+  lat: 47.4502
+  lon: -122.3088
+  name: Seattle
+  nws_station_id: KSEA
+  timezone: America/Los_Angeles
+- active: true
+  code: SFO
+  kalshi_market_prefix: KXHIGHTSFO
+  kalshi_market_prefix_low: KXLOWTSFO
+  lat: 37.6213
+  lon: -122.3790
+  name: San Francisco
+  nws_station_id: KSFO
+  timezone: America/Los_Angeles

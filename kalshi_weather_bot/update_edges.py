@@ -447,7 +447,7 @@ async def run_update():
             except Exception:
                 continue
                 
-            # If target date <= today, let's fetch outcomes
+            # If target date < today, let's fetch outcomes
             # Find city name from location line
             city_name = "Miami"
             for c in CITY_STATIONS.keys():
@@ -460,6 +460,13 @@ async def run_update():
             station_id = station_info["station"]
             temp_type = "HIGH" if "High" in t["location_line"] else "LOW"
             
+            # Skip settlement if target date is not in the past relative to local timezone
+            tz = pytz.timezone(timezone_str)
+            local_today = datetime.now(tz).strftime("%Y-%m-%d")
+            if trade_date_str >= local_today:
+                logger.info(f"Skipping auto-settlement for {t['ticker']}: Target date {trade_date_str} is not in the past (local today: {local_today})")
+                continue
+                
             # Fetch actual temp
             actual_temp = await fetch_nws_actual_high_low(station_id, trade_date_str, timezone_str, temp_type)
             if actual_temp is not None:

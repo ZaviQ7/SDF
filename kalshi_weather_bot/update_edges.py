@@ -506,11 +506,6 @@ async def run_update():
         else:
             historical_trades.append(t)
             
-    # Sort active trades by Net EV descending (highest EV at the top)
-    active_trades.sort(
-        key=lambda x: float(x["net_ev"].replace("%", "").replace("+", "").strip()) if "%" in x["net_ev"] else 0.0, 
-        reverse=True
-    )
     # Sort historical trades by date descending (latest at top of history)
     historical_trades.sort(key=lambda x: datetime.strptime(x["formatted_date"], "%b %d, %Y") if "%" not in x["formatted_date"] else datetime.now(), reverse=True)
 
@@ -579,24 +574,60 @@ async def run_update():
             f"| {d} | {stats['wins']} W / {stats['losses']} L | ${stats['cost']:.2f} | ${stats['payout']:.2f} | {'+' if d_net >= 0 else ''}${d_net:.2f} | {d_roi:.1f}% |"
         )
         
-    markdown_lines.extend([
-        "",
-        "---",
-        "",
-        "## 🔮 Active Weather Trades (Targeting Tomorrow)",
-        "*These represent tomorrow's predictions. Spreads and EV are live as of generating.*",
-        "",
-        "| Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |",
-        "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |"
-    ])
-    
+    # Group active trades by target date
+    active_by_date = {}
     for t in active_trades:
-        markdown_lines.append(
-            f"| {t['formatted_date']} | {t['location_line']} | {t['play_desc']} | {t['qty']} | {t['total_cost_line']} | {t['true_prob']} | {t['net_ev']} | {t['est_payout']} | {t['status']} |"
+        date = t["formatted_date"]
+        if date not in active_by_date:
+            active_by_date[date] = []
+        active_by_date[date].append(t)
+        
+    # Sort dates chronologically descending (latest date/tomorrow first)
+    sorted_active_dates = sorted(
+        active_by_date.keys(),
+        key=lambda x: datetime.strptime(x, "%b %d, %Y") if "%" not in x else datetime.now(),
+        reverse=True
+    )
+    
+    # We output a section for each date
+    for date in sorted_active_dates:
+        trades_for_date = active_by_date[date]
+        # Sort trades for this date by Net EV descending
+        trades_for_date.sort(
+            key=lambda x: float(x["net_ev"].replace("%", "").replace("+", "").strip()) if "%" in x["net_ev"] else 0.0,
+            reverse=True
         )
         
+        markdown_lines.extend([
+            "",
+            "---",
+            "",
+            f"## 🔮 Active Weather Edges for {date}",
+            f"*These represent active predictions for {date}. Spreads and EV are live as of generating.*",
+            "",
+            "| Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |",
+            "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |"
+        ])
+        
+        for t in trades_for_date:
+            markdown_lines.append(
+                f"| {t['formatted_date']} | {t['location_line']} | {t['play_desc']} | {t['qty']} | {t['total_cost_line']} | {t['true_prob']} | {t['net_ev']} | {t['est_payout']} | {t['status']} |"
+            )
+            
     if not active_trades:
-        markdown_lines.append("| - | *No active trades* | - | - | - | - | - | - | - |")
+        tomorrow_dt = datetime.now(pytz.timezone("America/New_York")) + timedelta(days=1)
+        tomorrow_str = tomorrow_dt.strftime("%b %d, %Y")
+        markdown_lines.extend([
+            "",
+            "---",
+            "",
+            f"## 🔮 Active Weather Edges for {tomorrow_str}",
+            "*These represent tomorrow's predictions. Spreads and EV are live as of generating.*",
+            "",
+            "| Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |",
+            "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
+            "| - | *No active trades* | - | - | - | - | - | - | - |"
+        ])
         
     markdown_lines.extend([
         "",

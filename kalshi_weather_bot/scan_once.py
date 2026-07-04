@@ -82,6 +82,17 @@ async def scan():
             ("LOW", city["kalshi_market_prefix_low"])
         ]
         
+        # Download forecasts once per city for each date
+        forecasts_by_date = {}
+        for target_date in target_dates:
+            gfs = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
+            await asyncio.sleep(1.0)
+            ecmwf = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
+            await asyncio.sleep(1.0)
+            hrrr = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
+            await asyncio.sleep(1.0)
+            forecasts_by_date[target_date] = (gfs, ecmwf, hrrr)
+
         for temp_type, prefix in scans:
             # Fetch Kalshi Markets
             markets = await client.get_weather_markets(prefix)
@@ -99,19 +110,13 @@ async def scan():
                 if not date_markets:
                     continue
                     
-                logger.info(f"Checking {city_name} {temp_type} for {target_date}...")
-                
-                # Download GFS and ECMWF ensembles + HRRR forecast
-                gfs_forecast = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-                ecmwf_forecast = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-                
-                # Fetch NWS hourly forecast (HRRR derived) for the target date
-                hrrr_forecast = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
-                
+                gfs_forecast, ecmwf_forecast, hrrr_forecast = forecasts_by_date.get(target_date, (None, None, None))
                 if not gfs_forecast and not ecmwf_forecast:
                     logger.warning(f"  Failed to retrieve weather forecasts for {city_name} on {target_date}.")
                     continue
                     
+                logger.info(f"Checking {city_name} {temp_type} for {target_date}...")
+                
                 # Process & Pool Ensembles with MOS rolling bias + HRRR shift
                 bias_key = f"{city['code']}_{temp_type}"
                 bias_offset = bias_offsets.get(bias_key, 0.0)

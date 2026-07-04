@@ -269,6 +269,18 @@ async def run_update():
         except Exception:
             continue
             
+        # Download forecasts once per city
+        gfs_forecast = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
+        await asyncio.sleep(1.0)
+        ecmwf_forecast = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
+        await asyncio.sleep(1.0)
+        hrrr_forecast = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
+        await asyncio.sleep(1.0)
+        
+        if not gfs_forecast and not ecmwf_forecast:
+            logger.warning(f"  Skipping city {city_name} because no weather forecasts could be retrieved.")
+            continue
+            
         scans = [
             ("HIGH", city["kalshi_market_prefix"]),
             ("LOW", city["kalshi_market_prefix_low"])
@@ -282,13 +294,6 @@ async def run_update():
                 
             date_markets = [m for m in markets if date_ticker_str in m["ticker"]]
             if not date_markets:
-                continue
-                
-            gfs_forecast = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-            ecmwf_forecast = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-            hrrr_forecast = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
-            
-            if not gfs_forecast and not ecmwf_forecast:
                 continue
                 
             bias_key = f"{city['code']}_{temp_type}"
@@ -502,8 +507,11 @@ async def run_update():
         else:
             historical_trades.append(t)
             
-    # Sort active trades by formatted date
-    active_trades.sort(key=lambda x: x["formatted_date"])
+    # Sort active trades by Net EV descending (highest EV at the top)
+    active_trades.sort(
+        key=lambda x: float(x["net_ev"].replace("%", "").replace("+", "").strip()) if "%" in x["net_ev"] else 0.0, 
+        reverse=True
+    )
     # Sort historical trades by date descending (latest at top of history)
     historical_trades.sort(key=lambda x: datetime.strptime(x["formatted_date"], "%b %d, %Y") if "%" not in x["formatted_date"] else datetime.now(), reverse=True)
 

@@ -51,47 +51,58 @@ class GFSDownloader:
         
         logger.info(f"Downloading GFS ensemble for ({lat}, {lon}) on {target_date}...")
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=15) as resp:
-                    if resp.status != 200:
-                        text = await resp.text()
-                        logger.error(f"Open-Meteo GFS API error ({resp.status}): {text}")
-                        return None
+        max_retries = 3
+        backoff = 2.0
+        for attempt in range(max_retries):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=15) as resp:
+                        if resp.status == 429:
+                            logger.warning(f"Open-Meteo GFS API rate limited (429). Retrying in {backoff}s...")
+                            await asyncio.sleep(backoff)
+                            backoff *= 2
+                            continue
+                        elif resp.status != 200:
+                            text = await resp.text()
+                            logger.error(f"Open-Meteo GFS API error ({resp.status}): {text}")
+                            return None
+                            
+                        data = await resp.json()
+                        hourly = data.get("hourly", {})
+                        times = hourly.get("time", [])
                         
-                    data = await resp.json()
-                    hourly = data.get("hourly", {})
-                    times = hourly.get("time", [])
-                    
-                    # Find indices matching the target date (local time)
-                    indices = [i for i, t in enumerate(times) if t.startswith(target_date)]
-                    if not indices:
-                        logger.error(f"No forecast times found matching target date {target_date}")
-                        return None
+                        # Find indices matching the target date (local time)
+                        indices = [i for i, t in enumerate(times) if t.startswith(target_date)]
+                        if not indices:
+                            logger.error(f"No forecast times found matching target date {target_date}")
+                            return None
+                            
+                        # Extract ensemble member keys
+                        member_keys = [k for k in hourly.keys() if k.startswith("temperature_2m")]
                         
-                    # Extract ensemble member keys
-                    member_keys = [k for k in hourly.keys() if k.startswith("temperature_2m")]
-                    
-                    # For each member, extract the temperatures for target date indices
-                    member_forecasts = {}
-                    for key in member_keys:
-                        # Clean key to standard name, e.g. "temperature_2m_member05" -> "member05"
-                        clean_key = key.replace("temperature_2m_", "").replace("temperature_2m", "control")
-                        temps = [hourly[key][idx] for idx in indices if hourly[key][idx] is not None]
-                        if temps:
-                            member_forecasts[clean_key] = temps
-                        
-                    logger.info(f"Successfully processed {len(member_forecasts)} GFS ensemble members.")
-                    return {
-                        "source": "GFS",
-                        "target_date": target_date,
-                        "timezone": timezone,
-                        "forecast_hours": [times[idx] for idx in indices],
-                        "members": member_forecasts
-                    }
-        except Exception as e:
-            logger.error(f"Error downloading GFS ensemble data: {e}")
-            return None
+                        # For each member, extract the temperatures for target date indices
+                        member_forecasts = {}
+                        for key in member_keys:
+                            clean_key = key.replace("temperature_2m_", "").replace("temperature_2m", "control")
+                            temps = [hourly[key][idx] for idx in indices if hourly[key][idx] is not None]
+                            if temps:
+                                member_forecasts[clean_key] = temps
+                            
+                        logger.info(f"Successfully processed {len(member_forecasts)} GFS ensemble members.")
+                        return {
+                            "source": "GFS",
+                            "target_date": target_date,
+                            "timezone": timezone,
+                            "forecast_hours": [times[idx] for idx in indices],
+                            "members": member_forecasts
+                        }
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Error downloading GFS ensemble data: {e}")
+                    return None
+                logger.warning(f"Error downloading GFS ensemble data (attempt {attempt+1}/{max_retries}): {e}. Retrying in {backoff}s...")
+                await asyncio.sleep(backoff)
+                backoff *= 2
 
     async def get_current_observations(self, station_id: str) -> Optional[Dict[str, Any]]:
         """Get latest observations from the NWS station (public endpoint)."""

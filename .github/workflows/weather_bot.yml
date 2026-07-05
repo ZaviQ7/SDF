@@ -38,6 +38,11 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Run Connection Diagnostics
+        run: |
+          cd kalshi_weather_bot
+          python test_download.py
+
       - name: Run Weather Bot Scan
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

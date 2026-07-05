@@ -443,13 +443,19 @@ async def run_scan(
                 # Calculate model probabilities for each contract
                 model_probabilities = {}
                 for m in date_markets:
+                    ticker = m["ticker"]
+                    # Skip cross-contamination from substring matching in Kalshi API
+                    ticker_type = "HIGH" if "HIGH" in ticker else "LOW"
+                    if ticker_type != temp_type:
+                        continue
+                        
                     rtype, val1, val2 = parse_range(m["title"])
                     if not rtype:
                         continue
                     prob = calculate_market_probability(
                         rtype, val1, val2, pooled_temps
                     )
-                    model_probabilities[m["ticker"]] = prob
+                    model_probabilities[ticker] = prob
 
                 # Find edges
                 edges = edge_detector.find_edges(date_markets, model_probabilities)

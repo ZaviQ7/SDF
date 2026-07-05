@@ -206,6 +206,7 @@ async def run_update():
     # Scan tomorrow's new edges
     new_edges = []
     live_market_stats = {}
+    cached_pooled_temps = {}
     
     for city in cities:
         if not city.get("active", True):
@@ -325,6 +326,7 @@ async def run_update():
                 except Exception as e:
                     logger.error(f"  Failed to fetch today's actual observations so far: {e}")
                     
+            cached_pooled_temps[(city["code"], target_date, temp_type)] = pooled_temps
             stats = model_processor.get_distribution_stats(pooled_temps)
             mean_val = stats["mean"]
             
@@ -332,8 +334,13 @@ async def run_update():
             
             model_probabilities = {}
             for m in date_markets:
-                title = m["title"]
                 ticker = m["ticker"]
+                # Skip cross-contamination from substring matching in Kalshi API
+                ticker_type = "HIGH" if "HIGH" in ticker else "LOW"
+                if ticker_type != temp_type:
+                    continue
+                    
+                title = m["title"]
                 rtype, val1, val2 = parse_range(title)
                 if not rtype:
                     continue
@@ -369,49 +376,104 @@ async def run_update():
     updated_logged_trades = []
     for t in logged_trades:
         ticker = t["ticker"]
-        if "Open" in t["status"] and ticker in live_market_stats:
-            stats = live_market_stats[ticker]
-            side = "YES" if "YES" in t["play_desc"] else "NO"
-            
-            yes_bid = stats["yes_bid"]
-            yes_ask = stats["yes_ask"]
-            no_bid = stats["no_bid"]
-            no_ask = stats["no_ask"]
-            
-            if side == "YES":
-                current_price = yes_bid + 0.01 if (yes_bid + 0.01) < yes_ask else yes_bid
-                if current_price <= 0:
-                    current_price = 0.01
-            else:
-                current_price = no_bid + 0.01 if (no_bid + 0.01) < no_ask else no_bid
-                if current_price <= 0:
-                    current_price = 0.01
+        if "Open" in t["status"]:
+            if ticker in live_market_stats:
+                stats = live_market_stats[ticker]
+                side = "YES" if "YES" in t["play_desc"] else "NO"
+                
+                yes_bid = stats["yes_bid"]
+                yes_ask = stats["yes_ask"]
+                no_bid = stats["no_bid"]
+                no_ask = stats["no_ask"]
+                
+                if side == "YES":
+                    current_price = yes_bid + 0.01 if (yes_bid + 0.01) < yes_ask else yes_bid
+                    if current_price <= 0:
+                        current_price = 0.01
+                else:
+                    current_price = no_bid + 0.01 if (no_bid + 0.01) < no_ask else no_bid
+                    if current_price <= 0:
+                        current_price = 0.01
+                        
+                prob_play = stats["model_prob"] if side == "YES" else (1.0 - stats["model_prob"])
+                
+                fee_unit = calculate_maker_fee(current_price, 1)
+                cost_unit = current_price + fee_unit
+                current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                     
-            prob_play = stats["model_prob"] if side == "YES" else (1.0 - stats["model_prob"])
-            
-            fee_unit = calculate_maker_fee(current_price, 1)
-            cost_unit = current_price + fee_unit
-            current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
-                
-            # Keep the trade ONLY if true prob > 53% AND EV > 0%
-            if prob_play > 0.53 and current_ev > 0.0:
-                size = t["qty"]
-                cost = current_price * size
-                fee = calculate_maker_fee(current_price, size)
-                total = cost + fee
-                payout = size * 1.00
-                
-                try:
-                    t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
-                except Exception:
-                    pass
-                t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
-                t["true_prob"] = f"{prob_play:.1%}"
-                t["net_ev"] = f"{current_ev:>+6.1%}"
-                t["est_payout"] = f"${payout:.2f}"
-                updated_logged_trades.append(t)
+                # Keep the trade ONLY if true prob > 53% AND EV > 0%
+                if prob_play > 0.53 and current_ev > 0.0:
+                    size = t["qty"]
+                    cost = current_price * size
+                    fee = calculate_maker_fee(current_price, size)
+                    total = cost + fee
+                    payout = size * 1.00
+                    
+                    try:
+                        t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
+                    except Exception:
+                        pass
+                    t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
+                    t["true_prob"] = f"{prob_play:.1%}"
+                    t["net_ev"] = f"{current_ev:>+6.1%}"
+                    t["est_payout"] = f"${payout:.2f}"
+                    updated_logged_trades.append(t)
+                else:
+                    logger.info(f"Removing open trade {ticker} from log: True Prob ({prob_play:.1%}) <= 53% or EV ({current_ev:+.1%}) <= 0%")
             else:
-                logger.info(f"Removing open trade {ticker} from log: True Prob ({prob_play:.1%}) <= 53% or EV ({current_ev:+.1%}) <= 0%")
+                # If ticker is closed on Kalshi, evaluate using cached pooled forecast
+                parts = ticker.split("-")
+                if len(parts) >= 3:
+                    prefix = parts[0]
+                    trade_city = None
+                    trade_temp_type = None
+                    for c in cities:
+                        if prefix == c["kalshi_market_prefix"]:
+                            trade_city = c
+                            trade_temp_type = "HIGH"
+                            break
+                        elif prefix == c["kalshi_market_prefix_low"]:
+                            trade_city = c
+                            trade_temp_type = "LOW"
+                            break
+                            
+                    try:
+                        dt = datetime.strptime(parts[1], "%y%b%d")
+                        target_date_str = dt.strftime("%Y-%m-%d")
+                    except Exception:
+                        updated_logged_trades.append(t)
+                        continue
+                        
+                    if trade_city and trade_temp_type:
+                        key = (trade_city["code"], target_date_str, trade_temp_type)
+                        pooled = cached_pooled_temps.get(key)
+                        if pooled is not None and len(pooled) > 0:
+                            play_desc = t["play_desc"]
+                            side = "YES" if "Buy YES" in play_desc else "NO"
+                            rtype, val1, val2 = parse_range(play_desc)
+                            if rtype:
+                                prob = calculate_market_probability(rtype, val1, val2, pooled)
+                                prob_play = prob if side == "YES" else (1.0 - prob)
+                                
+                                price_match = re.search(r"@\s*(\d+)¢", play_desc)
+                                if price_match:
+                                    current_price = float(price_match.group(1)) / 100.0
+                                else:
+                                    current_price = 0.01
+                                    
+                                fee_unit = calculate_maker_fee(current_price, 1)
+                                cost_unit = current_price + fee_unit
+                                current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
+                                
+                                if prob_play > 0.53 and current_ev > 0.0:
+                                    t["true_prob"] = f"{prob_play:.1%}"
+                                    t["net_ev"] = f"{current_ev:>+6.1%}"
+                                    updated_logged_trades.append(t)
+                                    logger.info(f"Updated closed open trade {ticker}: Prob {prob_play:.1%}, EV {current_ev:+.1%}")
+                                else:
+                                    logger.info(f"Removing closed open trade {ticker} from log: True Prob ({prob_play:.1%}) <= 53% or EV ({current_ev:+.1%}) <= 0%")
+                                continue
+                updated_logged_trades.append(t)
         else:
             updated_logged_trades.append(t)
             

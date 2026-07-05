@@ -11,7 +11,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from src.utils.bias_tracker import BIasTracker
+from src.utils.bias_tracker import BiasTracker
 from scan_once import scan
 
 def setup_mock_history():
@@ -51,7 +51,7 @@ async def run_test():
         cities_data = yaml.safe_load(f)
         cities = cities_data.get("cities", [])
         
-    bias_tracker = BIasTracker(config)
+    bias_tracker = BiasTracker(config)
     
     # Run the bias calculation (lookback=14)
     # This will load history, skip fetching yesterday since we didn't mock yesterday specifically,

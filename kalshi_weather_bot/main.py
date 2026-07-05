@@ -12,9 +12,6 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.data_ingestion.kalshi_client import KalshiWeatherClient
-from src.data_ingestion.gfs_downloader import GFSDownloader
-from src.data_ingestion.ecmwf_downloader import ECMWFDownloader
-from src.data_ingestion.hrrr_downloader import HRRRDownloader
 from src.models.weather_model import WeatherModelProcessor
 from src.models.probability import calculate_market_probability
 from src.trading.edge_detector import EdgeDetector
@@ -23,7 +20,8 @@ from src.trading.order_executor import OrderExecutor
 from src.monitoring.logger import setup_logging
 from src.monitoring.dashboard import TerminalDashboard
 from src.utils.validators import validate_config, validate_cities
-from src.utils.bias_tracker import BIasTracker
+from src.utils.bias_tracker import BiasTracker
+from core_scanner import get_forecasts_for_date
 
 # Capture log stream in memory to display on terminal dashboard
 class DashboardLogHandler(logging.Handler):
@@ -73,15 +71,12 @@ async def main():
         
     # 4. Instantiate components
     client = KalshiWeatherClient(config)
-    gfs_downloader = GFSDownloader(config)
-    ecmwf_downloader = ECMWFDownloader(config)
-    hrrr_downloader = HRRRDownloader(config)
     model_processor = WeatherModelProcessor(config)
     edge_detector = EdgeDetector(config)
     risk_manager = RiskManager(config)
     executor = OrderExecutor(client, config)
     dashboard = TerminalDashboard()
-    bias_tracker = BIasTracker(config)
+    bias_tracker = BiasTracker(config)
     bias_offsets = bias_tracker.load_bias_offsets()
     
     # Initialize API client
@@ -130,16 +125,10 @@ async def main():
                     (local_now + timedelta(days=1)).strftime("%Y-%m-%d")
                 ]
                 
-                # Download forecasts once per city for each date
+                # Download forecasts once per city using cache/mixture collection
                 city_forecasts = {}
                 for target_date in target_dates:
-                    gfs = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-                    await asyncio.sleep(1.0)
-                    ecmwf = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-                    await asyncio.sleep(1.0)
-                    hrrr = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
-                    await asyncio.sleep(1.0)
-                    city_forecasts[target_date] = (gfs, ecmwf, hrrr)
+                    city_forecasts[target_date] = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
 
                 # Scan both High and Low markets
                 scans = [
@@ -159,13 +148,13 @@ async def main():
                         markets_by_ticker[m["ticker"]] = m
                         
                     for target_date in target_dates:
-                        # Find Kalshi markets targeting this date
-                        # Weather markets contain resolving dates in their tickers (e.g. 26JUL04)
-                        # We convert the target_date to Kalshi ticker format, e.g. "2026-07-04" -> "26JUL04"
                         try:
                             dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
-                            # Convert year to 2 digits, month abbreviation in caps, day in 2 digits
                             date_ticker_str = dt_obj.strftime("%y%b%d").upper()
+                            # Compute lead hours to target date
+                            target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
+                            current_dt = datetime.now()
+                            hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
                         except Exception as e:
                             logger.error(f"Error parsing date format: {e}")
                             continue
@@ -175,25 +164,34 @@ async def main():
                         if not date_markets:
                             continue
                             
-                        gfs_forecast, ecmwf_forecast, hrrr_forecast = city_forecasts.get(target_date, (None, None, None))
-                        if not gfs_forecast and not ecmwf_forecast:
+                        forecasts = city_forecasts.get(target_date, {})
+                        gfs_forecast = forecasts.get("gfs")
+                        ecmwf_forecast = forecasts.get("ecmwf")
+                        hrrr_forecast = forecasts.get("hrrr")
+                        icon_forecast = forecasts.get("icon")
+                        gem_forecast = forecasts.get("gem")
+                        
+                        if not any([gfs_forecast, ecmwf_forecast, icon_forecast, gem_forecast]):
                             logger.warning(f"No weather ensemble forecasts downloaded for {city_name} on {target_date}")
                             continue
                             
                         logger.info(f"Scanning {city_name} {temp_type} for date {target_date} ({len(date_markets)} markets)")
                         
-                        # Pool forecasts and calculate distribution stats with MOS rolling bias + HRRR shift
+                        # Pool forecasts and calculate distribution stats with MOS rolling bias
                         bias_key = f"{city['code']}_{temp_type}"
                         bias_offset = bias_offsets.get(bias_key, 0.0)
                         if bias_offset != 0.0:
                             logger.info(f"Applying MOS rolling bias offset for {bias_key}: {bias_offset:+.2f}°F")
                             
                         pooled_temps = model_processor.process_ensembles(
-                            gfs_forecast, 
-                            ecmwf_forecast, 
-                            temp_type, 
-                            bias_offset=bias_offset, 
-                            hrrr_data=hrrr_forecast
+                            gfs_data=gfs_forecast,
+                            ecmwf_data=ecmwf_forecast,
+                            temp_type=temp_type,
+                            bias_offset=bias_offset,
+                            hrrr_data=hrrr_forecast,
+                            icon_data=icon_forecast,
+                            gem_data=gem_forecast,
+                            hours_to_target=hours_to_target
                         )
                         if len(pooled_temps) == 0:
                             continue

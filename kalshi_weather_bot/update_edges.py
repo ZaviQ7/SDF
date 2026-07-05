@@ -8,20 +8,19 @@ import re
 import aiohttp
 import subprocess
 from datetime import datetime, timedelta
+import numpy as np
 
 # Add project root to python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.data_ingestion.kalshi_client import KalshiWeatherClient
-from src.data_ingestion.gfs_downloader import GFSDownloader
-from src.data_ingestion.ecmwf_downloader import ECMWFDownloader
-from src.data_ingestion.hrrr_downloader import HRRRDownloader
 from src.models.weather_model import WeatherModelProcessor
 from src.models.probability import calculate_market_probability
 from src.trading.edge_detector import EdgeDetector
 from src.trading.risk_manager import RiskManager
 from src.utils.helpers import parse_range, calculate_maker_fee
-from src.utils.bias_tracker import BIasTracker
+from src.utils.bias_tracker import BiasTracker
+from core_scanner import get_forecasts_for_date, fetch_nws_actual_high_low
 
 # Suppress debug logs
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -31,42 +30,7 @@ logger.setLevel(logging.INFO)
 # Map city names to NWS airport stations and timezones (populated dynamically from cities.yaml)
 CITY_STATIONS = {}
 
-async def fetch_nws_actual_high_low(station_id: str, target_date_str: str, timezone_str: str, temp_type: str) -> float | None:
-    """Query NWS hourly observations to find yesterday's actual high/low."""
-    url = f"https://api.weather.gov/stations/{station_id}/observations"
-    headers = {"User-Agent": "KalshiWeatherBot/1.0 (contact@kalshiedgebot.com)"}
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=10) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
-                features = data.get("features", [])
-                
-                tz = pytz.timezone(timezone_str)
-                local_temps = []
-                
-                for f in features:
-                    props = f.get("properties", {})
-                    timestamp_str = props.get("timestamp")
-                    temp_c = props.get("temperature", {}).get("value")
-                    
-                    if timestamp_str and temp_c is not None:
-                        utc_dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-                        local_dt = utc_dt.astimezone(tz)
-                        
-                        if local_dt.strftime("%Y-%m-%d") == target_date_str:
-                            temp_f = temp_c * 9/5 + 32
-                            local_temps.append(temp_f)
-                            
-                if not local_temps:
-                    return None
-                    
-                return max(local_temps) if temp_type == "HIGH" else min(local_temps)
-    except Exception as e:
-        logger.error(f"Error fetching actual for station {station_id}: {e}")
-    return None
+# fetch_nws_actual_high_low is imported from core_scanner
 
 def evaluate_contract(ticker: str, actual_temp: float) -> bool | None:
     """Evaluate if a weather range contract settled YES (True) or NO (False)."""
@@ -223,13 +187,10 @@ async def run_update():
     config['kalshi']['trading']['min_edge_threshold'] = 0.00  # Fetch any positive edge
     
     client = KalshiWeatherClient(config)
-    gfs_downloader = GFSDownloader(config)
-    ecmwf_downloader = ECMWFDownloader(config)
-    hrrr_downloader = HRRRDownloader(config)
     model_processor = WeatherModelProcessor(config)
     edge_detector = EdgeDetector(config)
     risk_manager = RiskManager(config)
-    bias_tracker = BIasTracker(config)
+    bias_tracker = BiasTracker(config)
     bias_offsets = bias_tracker.load_bias_offsets()
     
     await client.initialize()
@@ -268,15 +229,27 @@ async def run_update():
         except Exception:
             continue
             
-        # Download forecasts once per city
-        gfs_forecast = await gfs_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-        await asyncio.sleep(1.0)
-        ecmwf_forecast = await ecmwf_downloader.download_ensemble_forecast(lat, lon, target_date, timezone_str)
-        await asyncio.sleep(1.0)
-        hrrr_forecast = await hrrr_downloader.download_forecast(lat, lon, target_date, timezone_str)
-        await asyncio.sleep(1.0)
+        # Download forecasts once per city using cache/mixture collection
+        forecasts = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
+        gfs_forecast = forecasts["gfs"]
+        ecmwf_forecast = forecasts["ecmwf"]
+        hrrr_forecast = forecasts["hrrr"]
+        icon_forecast = forecasts["icon"]
+        gem_forecast = forecasts["gem"]
         
-        if not gfs_forecast and not ecmwf_forecast:
+        try:
+            dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+            date_ticker_str = dt_obj.strftime("%y%b%d").upper()
+            date_formatted_str = dt_obj.strftime("%b %d, %Y")
+            
+            # Compute lead hours to target date
+            target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
+            current_dt = datetime.now()
+            hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
+        except Exception:
+            continue
+            
+        if not any([gfs_forecast, ecmwf_forecast, icon_forecast, gem_forecast]):
             logger.warning(f"  Skipping city {city_name} because no weather forecasts could be retrieved.")
             continue
             
@@ -301,15 +274,45 @@ async def run_update():
                 logger.info(f"  Applying MOS rolling bias offset for {bias_key}: {bias_offset:+.2f}°F")
                 
             pooled_temps = model_processor.process_ensembles(
-                gfs_forecast, 
-                ecmwf_forecast, 
-                temp_type, 
-                bias_offset=bias_offset, 
-                hrrr_data=hrrr_forecast
+                gfs_data=gfs_forecast,
+                ecmwf_data=ecmwf_forecast,
+                temp_type=temp_type,
+                bias_offset=bias_offset,
+                hrrr_data=hrrr_forecast,
+                icon_data=icon_forecast,
+                gem_data=gem_forecast,
+                hours_to_target=hours_to_target
             )
             if len(pooled_temps) == 0:
                 continue
                 
+            # Clip today's forecast using actual observed temperatures so far
+            tz = pytz.timezone(timezone_str)
+            local_now = datetime.now(tz)
+            today_str = local_now.strftime("%Y-%m-%d")
+            if target_date == today_str:
+                station_id = city["nws_station_id"]
+                try:
+                    actual_so_far = await fetch_nws_actual_high_low(station_id, target_date, timezone_str, temp_type)
+                    if actual_so_far is not None:
+                        local_hour = local_now.hour
+                        if temp_type == "HIGH":
+                            if local_hour >= 18:
+                                pooled_temps = np.full_like(pooled_temps, actual_so_far)
+                                logger.info(f"  Late afternoon (>= 6PM local). Daily HIGH is locked at {actual_so_far:.1f}°F.")
+                            else:
+                                pooled_temps = np.maximum(pooled_temps, actual_so_far)
+                                logger.info(f"  Today's actual HIGH so far is {actual_so_far:.1f}°F. Clipped forecast floor.")
+                        else:
+                            if local_hour >= 10:
+                                pooled_temps = np.full_like(pooled_temps, actual_so_far)
+                                logger.info(f"  Late morning (>= 10AM local). Daily LOW is locked at {actual_so_far:.1f}°F.")
+                            else:
+                                pooled_temps = np.minimum(pooled_temps, actual_so_far)
+                                logger.info(f"  Today's actual LOW so far is {actual_so_far:.1f}°F. Clipped forecast ceiling.")
+                except Exception as e:
+                    logger.error(f"  Failed to fetch today's actual observations so far: {e}")
+                    
             stats = model_processor.get_distribution_stats(pooled_temps)
             mean_val = stats["mean"]
             

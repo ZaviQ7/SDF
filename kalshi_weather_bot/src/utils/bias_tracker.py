@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-class BIasTracker:
+class BiasTracker:
     """Track forecasts vs actual observations, and compute rolling bias adjustments (MOS)."""
     
     def __init__(self, config: Dict[str, Any]):

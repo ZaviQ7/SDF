@@ -51,31 +51,37 @@ class EdgeDetector:
                 continue
                 
             # Determine target resting entry prices (join the bid or join the bid + 0.01)
-            # If we want to buy YES: we bid yes_bid + 0.01 (unless it crosses yes_ask, then we bid yes_bid)
             yes_entry = yes_bid + 0.01 if (yes_bid + 0.01) < yes_ask else yes_bid
             if yes_entry <= 0:
                 yes_entry = 0.01
                 
-            # If we want to buy NO: we bid no_bid + 0.01 (unless it crosses no_ask, then we bid no_bid)
             no_entry = no_bid + 0.01 if (no_bid + 0.01) < no_ask else no_bid
             if no_entry <= 0:
                 no_entry = 0.01
                 
             # Calculate EV at the resting entry price
-            # YES: EV = (prob * 1.0) - cost
             fee_yes = calculate_maker_fee(yes_entry, 1)
             cost_yes = yes_entry + fee_yes
             yes_ev = model_prob - cost_yes
             yes_ev_pct = yes_ev / cost_yes if cost_yes > 0 else 0.0
             
-            # NO: EV = ((1-prob) * 1.0) - cost
             fee_no = calculate_maker_fee(no_entry, 1)
             cost_no = no_entry + fee_no
             no_ev = (1.0 - model_prob) - cost_no
             no_ev_pct = no_ev / cost_no if cost_no > 0 else 0.0
             
-            # Determine the side with positive edge
-            if yes_ev_pct >= self.min_edge:
+            # Only emit the BEST side for this ticker (prevents contradictory signals)
+            best_side = None
+            best_ev = 0.0
+            
+            if yes_ev_pct >= self.min_edge and yes_ev_pct >= no_ev_pct:
+                best_side = "yes"
+                best_ev = yes_ev_pct
+            elif no_ev_pct >= self.min_edge and no_ev_pct > yes_ev_pct:
+                best_side = "no"
+                best_ev = no_ev_pct
+                
+            if best_side == "yes":
                 edges.append({
                     "ticker": ticker,
                     "title": m["title"],
@@ -84,14 +90,18 @@ class EdgeDetector:
                     "market_ask": yes_ask,
                     "market_bid": yes_bid,
                     "model_prob": model_prob,
-                    "market_prob": yes_ask, # Market ask is the standard comparison
+                    "market_prob": yes_ask,
                     "net_ev": yes_ev_pct,
                     "spread": spread,
+                    "yes_bid": yes_bid,
+                    "yes_ask": yes_ask,
+                    "no_bid": no_bid,
+                    "no_ask": no_ask,
                     "timestamp": datetime.utcnow().isoformat()
                 })
                 logger.info(f"🎯 Edge detected: {ticker} YES | Entry: {yes_entry:.2f} | Model: {model_prob:.1%} | EV: {yes_ev_pct:+.1%}")
                 
-            if no_ev_pct >= self.min_edge:
+            elif best_side == "no":
                 edges.append({
                     "ticker": ticker,
                     "title": m["title"],
@@ -103,6 +113,10 @@ class EdgeDetector:
                     "market_prob": no_ask,
                     "net_ev": no_ev_pct,
                     "spread": spread,
+                    "yes_bid": yes_bid,
+                    "yes_ask": yes_ask,
+                    "no_bid": no_bid,
+                    "no_ask": no_ask,
                     "timestamp": datetime.utcnow().isoformat()
                 })
                 logger.info(f"🎯 Edge detected: {ticker} NO | Entry: {no_entry:.2f} | Model: {1.0 - model_prob:.1%} | EV: {no_ev_pct:+.1%}")

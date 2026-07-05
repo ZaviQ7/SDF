@@ -219,54 +219,66 @@ async def run_update():
         tz = pytz.timezone(timezone_str)
         local_now = datetime.now(tz)
         
-        # We only generate tomorrow's new trades (to keep the active table clean)
-        target_date = (local_now + timedelta(days=1)).strftime("%Y-%m-%d")
-        
-        try:
-            dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
-            date_ticker_str = dt_obj.strftime("%y%b%d").upper()
-            date_formatted_str = dt_obj.strftime("%b %d, %Y")
-        except Exception:
-            continue
-            
-        # Download forecasts once per city using cache/mixture collection
-        forecasts = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
-        gfs_forecast = forecasts["gfs"]
-        ecmwf_forecast = forecasts["ecmwf"]
-        hrrr_forecast = forecasts["hrrr"]
-        icon_forecast = forecasts["icon"]
-        gem_forecast = forecasts["gem"]
-        
-        try:
-            dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
-            date_ticker_str = dt_obj.strftime("%y%b%d").upper()
-            date_formatted_str = dt_obj.strftime("%b %d, %Y")
-            
-            # Compute lead hours to target date
-            target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
-            current_dt = datetime.now()
-            hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
-        except Exception:
-            continue
-            
-        if not any([gfs_forecast, ecmwf_forecast, icon_forecast, gem_forecast]):
-            logger.warning(f"  Skipping city {city_name} because no weather forecasts could be retrieved.")
-            continue
-            
-        scans = [
-            ("HIGH", city["kalshi_market_prefix"]),
-            ("LOW", city["kalshi_market_prefix_low"])
+        target_dates = [
+            local_now.strftime("%Y-%m-%d"),
+            (local_now + timedelta(days=1)).strftime("%Y-%m-%d")
         ]
         
-        for temp_type, prefix in scans:
-            markets = await client.get_weather_markets(prefix)
-            await asyncio.sleep(1.0)  # Pacing rate limit protection
-            if not markets:
+        for target_date in target_dates:
+            try:
+                dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+                date_ticker_str = dt_obj.strftime("%y%b%d").upper()
+                date_formatted_str = dt_obj.strftime("%b %d, %Y")
+            except Exception:
                 continue
                 
-            date_markets = [m for m in markets if date_ticker_str in m["ticker"]]
-            if not date_markets:
+            # Download forecasts once per city using cache/mixture collection
+            forecasts = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
+            gfs_forecast = forecasts["gfs"]
+            ecmwf_forecast = forecasts["ecmwf"]
+            hrrr_forecast = forecasts["hrrr"]
+            icon_forecast = forecasts["icon"]
+            gem_forecast = forecasts["gem"]
+            
+            try:
+                dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+                date_ticker_str = dt_obj.strftime("%y%b%d").upper()
+                date_formatted_str = dt_obj.strftime("%b %d, %Y")
+                
+                # Compute lead hours to target date
+                target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
+                current_dt = datetime.now()
+                hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
+            except Exception:
                 continue
+                
+            if not any([gfs_forecast, ecmwf_forecast, icon_forecast, gem_forecast]):
+                logger.warning(f"  Skipping city {city_name} on {target_date} because no forecasts were retrieved.")
+                continue
+                
+            scans = [
+                ("HIGH", city["kalshi_market_prefix"]),
+                ("LOW", city["kalshi_market_prefix_low"])
+            ]
+            
+            for temp_type, prefix in scans:
+                # Skip already-determined same-day contracts
+                today_str = local_now.strftime("%Y-%m-%d")
+                if target_date == today_str:
+                    local_hour = local_now.hour
+                    if temp_type == "HIGH" and local_hour >= 15:
+                        continue
+                    if temp_type == "LOW" and local_hour >= 10:
+                        continue
+                        
+                markets = await client.get_weather_markets(prefix)
+                await asyncio.sleep(1.0)  # Pacing rate limit protection
+                if not markets:
+                    continue
+                    
+                date_markets = [m for m in markets if date_ticker_str in m["ticker"]]
+                if not date_markets:
+                    continue
                 
             bias_key = f"{city['code']}_{temp_type}"
             bias_offset = bias_offsets.get(bias_key, 0.0)

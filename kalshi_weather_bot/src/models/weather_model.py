@@ -100,7 +100,7 @@ class WeatherModelProcessor:
             # Fallback to equal weights if config or logic returns 0
             normalized_weights = {m: 1.0 / len(active_models) for m in active_models}
         else:
-            normalized_weights = {m: w / weight_sum for m in active_weights.items()}
+            normalized_weights = {m: w / weight_sum for m, w in active_weights.items()}
 
         logger.info(f"Assigned mixture weights for {temp_type}: " + ", ".join([f"{m}: {w:.1%}" for m, w in normalized_weights.items()]))
 

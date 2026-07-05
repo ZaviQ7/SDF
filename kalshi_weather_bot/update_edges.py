@@ -280,94 +280,94 @@ async def run_update():
                 date_markets = [m for m in markets if date_ticker_str in m["ticker"]]
                 if not date_markets:
                     continue
-                
-            bias_key = f"{city['code']}_{temp_type}"
-            bias_offset = bias_offsets.get(bias_key, 0.0)
-            if bias_offset != 0.0:
-                logger.info(f"  Applying MOS rolling bias offset for {bias_key}: {bias_offset:+.2f}°F")
-                
-            pooled_temps = model_processor.process_ensembles(
-                gfs_data=gfs_forecast,
-                ecmwf_data=ecmwf_forecast,
-                temp_type=temp_type,
-                bias_offset=bias_offset,
-                hrrr_data=hrrr_forecast,
-                icon_data=icon_forecast,
-                gem_data=gem_forecast,
-                hours_to_target=hours_to_target
-            )
-            if len(pooled_temps) == 0:
-                continue
-                
-            # Clip today's forecast using actual observed temperatures so far
-            tz = pytz.timezone(timezone_str)
-            local_now = datetime.now(tz)
-            today_str = local_now.strftime("%Y-%m-%d")
-            if target_date == today_str:
-                station_id = city["nws_station_id"]
-                try:
-                    actual_so_far = await fetch_nws_actual_high_low(station_id, target_date, timezone_str, temp_type)
-                    if actual_so_far is not None:
-                        local_hour = local_now.hour
-                        if temp_type == "HIGH":
-                            if local_hour >= 18:
-                                pooled_temps = np.full_like(pooled_temps, actual_so_far)
-                                logger.info(f"  Late afternoon (>= 6PM local). Daily HIGH is locked at {actual_so_far:.1f}°F.")
-                            else:
-                                pooled_temps = np.maximum(pooled_temps, actual_so_far)
-                                logger.info(f"  Today's actual HIGH so far is {actual_so_far:.1f}°F. Clipped forecast floor.")
-                        else:
-                            if local_hour >= 10:
-                                pooled_temps = np.full_like(pooled_temps, actual_so_far)
-                                logger.info(f"  Late morning (>= 10AM local). Daily LOW is locked at {actual_so_far:.1f}°F.")
-                            else:
-                                pooled_temps = np.minimum(pooled_temps, actual_so_far)
-                                logger.info(f"  Today's actual LOW so far is {actual_so_far:.1f}°F. Clipped forecast ceiling.")
-                except Exception as e:
-                    logger.error(f"  Failed to fetch today's actual observations so far: {e}")
                     
-            cached_pooled_temps[(city["code"], target_date, temp_type)] = pooled_temps
-            stats = model_processor.get_distribution_stats(pooled_temps)
-            mean_val = stats["mean"]
-            
-            bias_tracker.log_forecast(city["code"], temp_type, target_date, mean_val)
-            
-            model_probabilities = {}
-            for m in date_markets:
-                ticker = m["ticker"]
-                # Skip cross-contamination from substring matching in Kalshi API
-                ticker_type = "HIGH" if "HIGH" in ticker else "LOW"
-                if ticker_type != temp_type:
+                bias_key = f"{city['code']}_{temp_type}"
+                bias_offset = bias_offsets.get(bias_key, 0.0)
+                if bias_offset != 0.0:
+                    logger.info(f"  Applying MOS rolling bias offset for {bias_key}: {bias_offset:+.2f}°F")
+                    
+                pooled_temps = model_processor.process_ensembles(
+                    gfs_data=gfs_forecast,
+                    ecmwf_data=ecmwf_forecast,
+                    temp_type=temp_type,
+                    bias_offset=bias_offset,
+                    hrrr_data=hrrr_forecast,
+                    icon_data=icon_forecast,
+                    gem_data=gem_forecast,
+                    hours_to_target=hours_to_target
+                )
+                if len(pooled_temps) == 0:
                     continue
                     
-                title = m["title"]
-                rtype, val1, val2 = parse_range(title)
-                if not rtype:
-                    continue
+                # Clip today's forecast using actual observed temperatures so far
+                tz = pytz.timezone(timezone_str)
+                local_now = datetime.now(tz)
+                today_str = local_now.strftime("%Y-%m-%d")
+                if target_date == today_str:
+                    station_id = city["nws_station_id"]
+                    try:
+                        actual_so_far = await fetch_nws_actual_high_low(station_id, target_date, timezone_str, temp_type)
+                        if actual_so_far is not None:
+                            local_hour = local_now.hour
+                            if temp_type == "HIGH":
+                                if local_hour >= 18:
+                                    pooled_temps = np.full_like(pooled_temps, actual_so_far)
+                                    logger.info(f"  Late afternoon (>= 6PM local). Daily HIGH is locked at {actual_so_far:.1f}°F.")
+                                else:
+                                    pooled_temps = np.maximum(pooled_temps, actual_so_far)
+                                    logger.info(f"  Today's actual HIGH so far is {actual_so_far:.1f}°F. Clipped forecast floor.")
+                            else:
+                                if local_hour >= 10:
+                                    pooled_temps = np.full_like(pooled_temps, actual_so_far)
+                                    logger.info(f"  Late morning (>= 10AM local). Daily LOW is locked at {actual_so_far:.1f}°F.")
+                                else:
+                                    pooled_temps = np.minimum(pooled_temps, actual_so_far)
+                                    logger.info(f"  Today's actual LOW so far is {actual_so_far:.1f}°F. Clipped forecast ceiling.")
+                    except Exception as e:
+                        logger.error(f"  Failed to fetch today's actual observations so far: {e}")
+                        
+                cached_pooled_temps[(city["code"], target_date, temp_type)] = pooled_temps
+                stats = model_processor.get_distribution_stats(pooled_temps)
+                mean_val = stats["mean"]
+                
+                bias_tracker.log_forecast(city["code"], temp_type, target_date, mean_val)
+                
+                model_probabilities = {}
+                for m in date_markets:
+                    ticker = m["ticker"]
+                    # Skip cross-contamination from substring matching in Kalshi API
+                    ticker_type = "HIGH" if "HIGH" in ticker else "LOW"
+                    if ticker_type != temp_type:
+                        continue
+                        
+                    title = m["title"]
+                    rtype, val1, val2 = parse_range(title)
+                    if not rtype:
+                        continue
+                        
+                    prob = calculate_market_probability(rtype, val1, val2, pooled_temps)
+                    model_probabilities[ticker] = prob
                     
-                prob = calculate_market_probability(rtype, val1, val2, pooled_temps)
-                model_probabilities[ticker] = prob
-                
-                # Store live stats for updating existing logged trades
-                live_market_stats[ticker] = {
-                    "model_prob": prob,
-                    "yes_ask": m["yes_ask"],
-                    "no_ask": m["no_ask"],
-                    "yes_bid": m["yes_bid"],
-                    "no_bid": m["no_bid"],
-                    "title": title
-                }
-                
-            edges = edge_detector.find_edges(date_markets, model_probabilities)
-            for edge in edges:
-                if edge["model_prob"] > 0.53 and edge["net_ev"] > 0.0:
-                    edge["city"] = city_name
-                    edge["temp_type"] = temp_type
-                    edge["formatted_date"] = date_formatted_str
-                    edge["target_date"] = target_date
-                    size = risk_manager.calculate_position_size(edge, risk_manager.bankroll, 0.0)
-                    edge["suggested_size"] = size if size > 0 else 1
-                    new_edges.append(edge)
+                    # Store live stats for updating existing logged trades
+                    live_market_stats[ticker] = {
+                        "model_prob": prob,
+                        "yes_ask": m["yes_ask"],
+                        "no_ask": m["no_ask"],
+                        "yes_bid": m["yes_bid"],
+                        "no_bid": m["no_bid"],
+                        "title": title
+                    }
+                    
+                edges = edge_detector.find_edges(date_markets, model_probabilities)
+                for edge in edges:
+                    if edge["model_prob"] > 0.53 and edge["net_ev"] > 0.0:
+                        edge["city"] = city_name
+                        edge["temp_type"] = temp_type
+                        edge["formatted_date"] = date_formatted_str
+                        edge["target_date"] = target_date
+                        size = risk_manager.calculate_position_size(edge, risk_manager.bankroll, 0.0)
+                        edge["suggested_size"] = size if size > 0 else 1
+                        new_edges.append(edge)
                     
     await client.close()
     

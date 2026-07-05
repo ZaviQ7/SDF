@@ -129,14 +129,14 @@
     "date": "2026-07-05",
     "city": "PHX",
     "temp_type": "HIGH",
-    "forecast_mean": 107.30756097560977,
+    "forecast_mean": 107.31487804878049,
     "actual": null
   },
   {
     "date": "2026-07-05",
     "city": "PHX",
     "temp_type": "LOW",
-    "forecast_mean": 86.91243902439022,
+    "forecast_mean": 86.56048780487804,
     "actual": null
   },
   {
@@ -171,28 +171,28 @@
     "date": "2026-07-05",
     "city": "SEA",
     "temp_type": "HIGH",
-    "forecast_mean": 73.43365853658537,
+    "forecast_mean": 73.41024390243902,
     "actual": null
   },
   {
     "date": "2026-07-05",
     "city": "SEA",
     "temp_type": "LOW",
-    "forecast_mean": 53.46073170731708,
+    "forecast_mean": 53.290243902439016,
     "actual": null
   },
   {
     "date": "2026-07-05",
     "city": "SFO",
     "temp_type": "HIGH",
-    "forecast_mean": 67.34439024390245,
+    "forecast_mean": 67.5339024390244,
     "actual": null
   },
   {
     "date": "2026-07-05",
     "city": "SFO",
     "temp_type": "LOW",
-    "forecast_mean": 55.988292682926826,
+    "forecast_mean": 55.86463414634147,
     "actual": null
   }
 ]

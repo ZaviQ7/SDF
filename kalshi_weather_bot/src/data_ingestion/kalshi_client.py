@@ -289,6 +289,37 @@ class KalshiWeatherClient:
                 text = await resp.text()
                 raise Exception(f"Failed to place order ({resp.status}): {text}")
 
+    async def get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Get details/status of a specific order from Kalshi."""
+        if self.dry_run:
+            return self.simulated_orders.get(order_id)
+            
+        await self.rate_limiter.acquire('read')
+        path = f"/trade-api/v2/portfolio/orders/{order_id}"
+        headers = self._get_headers("GET", path)
+        
+        try:
+            async with self.session.get(f"{self.base_url}{path}", headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    order_info = data.get("order", {})
+                    return {
+                        "order_id": order_info.get("order_id"),
+                        "status": order_info.get("status"),
+                        "ticker": order_info.get("ticker"),
+                        "side": order_info.get("side"),
+                        "price": float(order_info.get("price", 0)) / 100.0,
+                        "size": int(order_info.get("count", 0)),
+                        "filled_size": int(order_info.get("filled_count", 0))
+                    }
+                else:
+                    text = await resp.text()
+                    logger.error(f"Failed to fetch order {order_id} ({resp.status}): {text}")
+                    return None
+        except Exception as e:
+            logger.error(f"Exception fetching order {order_id}: {e}")
+            return None
+
     async def cancel_order(self, order_id: str) -> bool:
         """Cancel an open order."""
         if self.dry_run:

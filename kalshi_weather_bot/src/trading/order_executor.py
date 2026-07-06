@@ -68,27 +68,18 @@ class OrderExecutor:
                 logger.info(f"Resting order {order_id} expired ({self.order_expiry_minutes}m timeout). Cancelling.")
                 await self.cancel_order(order_id)
                 
-        # 2. In live mode, we query the orders endpoint or positions to see if orders were filled
-        # In simulation mode, the client's update_simulation is called to perform the fills
+        # 2. In live mode, check order status directly from the exchange
         if not self.kalshi.dry_run:
-            # Live tracking: check current open orders on the exchange
             try:
-                # We can query all open orders or compare resting orders against current position counts
-                # For simplicity, we query active positions. If a position is found for a ticker that we
-                # placed a resting order on, the resting order is filled (or partially filled).
-                positions = await self.kalshi.get_positions()
-                pos_by_ticker = {p["ticker"]: p for p in positions}
-                
-                for order_id, order in list(self.open_orders.items()):
-                    ticker = order["ticker"]
-                    side = order["side"]
-                    size = order["size"]
-                    
-                    if ticker in pos_by_ticker:
-                        pos = pos_by_ticker[ticker]
-                        # If we have an active position matching the side, we assume fill occurred
-                        if pos["side"] == side and pos["size"] >= size:
-                            logger.info(f"🔔 Resting order {order_id} filled on exchange! Position: {pos['size']} contracts.")
+                for order_id in list(self.open_orders.keys()):
+                    ord_info = await self.kalshi.get_order(order_id)
+                    if ord_info:
+                        status = ord_info.get("status")
+                        if status in ["filled", "executed"]:
+                            logger.info(f"🔔 Resting order {order_id} filled on exchange!")
+                            del self.open_orders[order_id]
+                        elif status == "canceled":
+                            logger.info(f"Resting order {order_id} was canceled on exchange.")
                             del self.open_orders[order_id]
             except Exception as e:
                 logger.error(f"Error checking resting orders on exchange: {e}")

@@ -22,6 +22,7 @@ from src.monitoring.dashboard import TerminalDashboard
 from src.utils.validators import validate_config, validate_cities
 from src.utils.bias_tracker import BiasTracker
 from core_scanner import get_forecasts_for_date
+from src.utils.helpers import parse_range
 
 # Capture log stream in memory to display on terminal dashboard
 class DashboardLogHandler(logging.Handler):
@@ -152,9 +153,8 @@ async def main():
                             dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
                             date_ticker_str = dt_obj.strftime("%y%b%d").upper()
                             # Compute lead hours to target date
-                            target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
-                            current_dt = datetime.now()
-                            hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
+                            target_dt = tz.localize(datetime.combine(dt_obj.date(), datetime.max.time()))
+                            hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
                         except Exception as e:
                             logger.error(f"Error parsing date format: {e}")
                             continue

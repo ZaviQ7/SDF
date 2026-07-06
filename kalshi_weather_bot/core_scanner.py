@@ -435,9 +435,9 @@ async def run_scan(
                             f"  Skipping {city_name} today HIGH (past 3PM local)."
                         )
                         continue
-                    if temp_type == "LOW" and local_hour >= 10:
+                    if temp_type == "LOW" and local_hour >= 7:
                         logger.info(
-                            f"  Skipping {city_name} today LOW (past 10AM local)."
+                            f"  Skipping {city_name} today LOW (past 7AM local)."
                         )
                         continue
 
@@ -445,9 +445,8 @@ async def run_scan(
                     dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
                     date_ticker_str = dt_obj.strftime("%y%b%d").upper()
                     # Compute lead hours to target date
-                    target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
-                    current_dt = datetime.now()
-                    hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
+                    target_dt = tz.localize(datetime.combine(dt_obj.date(), datetime.max.time()))
+                    hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
                 except Exception:
                     continue
 
@@ -479,26 +478,8 @@ async def run_scan(
                 if len(pooled_temps) == 0:
                     continue
 
-                # Clip today's forecast with live observations
-                if target_date == today_str:
-                    station_id = city["nws_station_id"]
-                    try:
-                        actual_so_far = await fetch_nws_actual_high_low(
-                            station_id, target_date, timezone_str, temp_type
-                        )
-                        if actual_so_far is not None:
-                            if temp_type == "HIGH":
-                                pooled_temps = np.maximum(pooled_temps, actual_so_far)
-                                logger.info(
-                                    f"  Today's actual HIGH so far: {actual_so_far:.1f}°F. Clipped forecast floor."
-                                )
-                            else:
-                                pooled_temps = np.minimum(pooled_temps, actual_so_far)
-                                logger.info(
-                                    f"  Today's actual LOW so far: {actual_so_far:.1f}°F. Clipped forecast ceiling."
-                                )
-                    except Exception as e:
-                        logger.error(f"  Failed to fetch observations: {e}")
+                # Real-time NWS clipping is disabled to avoid sensor outlier/mismatch contamination.
+                # Relying entirely on models (such as hourly HRRR updates) for active predictions.
 
                 stats = model_processor.get_distribution_stats(pooled_temps)
                 logger.info(

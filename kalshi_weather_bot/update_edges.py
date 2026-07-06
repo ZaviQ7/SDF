@@ -93,9 +93,28 @@ def parse_logged_trades(file_path: str) -> list:
             if not ticker:
                 continue
                 
+            location_line = parts[1]
+            if ticker:
+                # Normalize separator to bullet point
+                location_line = location_line.replace(" | [Kalshi Link]", " • [Kalshi Link]")
+                if "Kalshi Link" not in location_line:
+                    ticker_parts = ticker.split("-")
+                    if len(ticker_parts) >= 2:
+                        market_series_prefix = ticker_parts[0].lower()
+                        event_ticker_prefix = "-".join(ticker_parts[:2]).lower()
+                        kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
+                        if "[NOAA Link]" in location_line:
+                            location_line = re.sub(
+                                r"(\[NOAA Link\]\([^\)]+\))",
+                                r"\1 • [Kalshi Link](" + kalshi_url + ")",
+                                location_line
+                            )
+                        else:
+                            location_line = f"{location_line} ([Kalshi Link]({kalshi_url}))"
+                            
             trades.append({
                 "formatted_date": parts[0],
-                "location_line": parts[1],
+                "location_line": location_line,
                 "play_desc": parts[2],
                 "qty": int(parts[3]),
                 "total_cost_line": parts[4],
@@ -277,9 +296,8 @@ async def run_update():
                 date_formatted_str = dt_obj.strftime("%b %d, %Y")
                 
                 # Compute lead hours to target date
-                target_dt = datetime.combine(dt_obj.date(), datetime.max.time())
-                current_dt = datetime.now()
-                hours_to_target = (target_dt - current_dt).total_seconds() / 3600.0
+                target_dt = tz.localize(datetime.combine(dt_obj.date(), datetime.max.time()))
+                hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
             except Exception:
                 continue
                 
@@ -299,7 +317,7 @@ async def run_update():
                     local_hour = local_now.hour
                     if temp_type == "HIGH" and local_hour >= 15:
                         continue
-                    if temp_type == "LOW" and local_hour >= 10:
+                    if temp_type == "LOW" and local_hour >= 7:
                         continue
                         
                 markets = await client.get_weather_markets(prefix)
@@ -329,32 +347,8 @@ async def run_update():
                 if len(pooled_temps) == 0:
                     continue
                     
-                # Clip today's forecast using actual observed temperatures so far
-                tz = pytz.timezone(timezone_str)
-                local_now = datetime.now(tz)
-                today_str = local_now.strftime("%Y-%m-%d")
-                if target_date == today_str:
-                    station_id = city["nws_station_id"]
-                    try:
-                        actual_so_far = await fetch_nws_actual_high_low(station_id, target_date, timezone_str, temp_type)
-                        if actual_so_far is not None:
-                            local_hour = local_now.hour
-                            if temp_type == "HIGH":
-                                if local_hour >= 18:
-                                    pooled_temps = np.full_like(pooled_temps, actual_so_far)
-                                    logger.info(f"  Late afternoon (>= 6PM local). Daily HIGH is locked at {actual_so_far:.1f}°F.")
-                                else:
-                                    pooled_temps = np.maximum(pooled_temps, actual_so_far)
-                                    logger.info(f"  Today's actual HIGH so far is {actual_so_far:.1f}°F. Clipped forecast floor.")
-                            else:
-                                if local_hour >= 10:
-                                    pooled_temps = np.full_like(pooled_temps, actual_so_far)
-                                    logger.info(f"  Late morning (>= 10AM local). Daily LOW is locked at {actual_so_far:.1f}°F.")
-                                else:
-                                    pooled_temps = np.minimum(pooled_temps, actual_so_far)
-                                    logger.info(f"  Today's actual LOW so far is {actual_so_far:.1f}°F. Clipped forecast ceiling.")
-                    except Exception as e:
-                        logger.error(f"  Failed to fetch today's actual observations so far: {e}")
+                # Real-time NWS clipping is disabled to avoid sensor outlier/mismatch contamination.
+                # Relying entirely on models (such as hourly HRRR updates) for active predictions.
                         
                 cached_pooled_temps[(city["code"], target_date, temp_type)] = pooled_temps
                 stats = model_processor.get_distribution_stats(pooled_temps)
@@ -399,8 +393,8 @@ async def run_update():
                         edge["suggested_size"] = size if size > 0 else 1
                         new_edges.append(edge)
                     
-    if not settle_only:
-        await client.close()
+    # Close client session as it is no longer needed
+    await client.close()
     
     # 2.1 Update existing open weather trades with current live stats
     logger.info("Updating existing open weather trades with live stats...")
@@ -796,13 +790,14 @@ async def run_update():
     # 7. Git commit and push
     try:
         subprocess.run(["git", "add", edges_file_path, "data/historical/"], check=True)
-        status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-        if status.stdout.strip():
+        # Check if there are staged changes to commit
+        staged = subprocess.run(["git", "diff", "--cached", "--quiet"])
+        if staged.returncode == 1:
             subprocess.run(["git", "commit", "-m", "Add daily PnL breakdown to tracking dashboard"], check=True)
             subprocess.run(["git", "push"], check=True)
             logger.info("Successfully pushed updates to Git remote.")
         else:
-            logger.info("No modifications detected in theoretical_edges.md. Git push skipped.")
+            logger.info("No staged modifications detected. Git push skipped.")
     except Exception as git_err:
         logger.error(f"Git execution failed: {git_err}")
 

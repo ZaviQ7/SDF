@@ -74,7 +74,7 @@
     "city": "PHIL",
     "temp_type": "HIGH",
     "forecast_mean": 93.13605,
-    "actual": null
+    "actual": 93.2
   },
   {
     "date": "2026-07-05",
@@ -88,7 +88,7 @@
     "city": "MIA",
     "temp_type": "HIGH",
     "forecast_mean": 90.46006000000001,
-    "actual": null
+    "actual": 93.91999999999999
   },
   {
     "date": "2026-07-05",
@@ -102,7 +102,7 @@
     "city": "NY",
     "temp_type": "HIGH",
     "forecast_mean": 85.30123,
-    "actual": null
+    "actual": 80.06
   },
   {
     "date": "2026-07-05",
@@ -144,14 +144,14 @@
     "city": "ATL",
     "temp_type": "HIGH",
     "forecast_mean": 91.88333999999999,
-    "actual": null
+    "actual": 93.2
   },
   {
     "date": "2026-07-05",
     "city": "ATL",
     "temp_type": "LOW",
     "forecast_mean": 75.02,
-    "actual": null
+    "actual": 71.6
   },
   {
     "date": "2026-07-05",
@@ -200,7 +200,7 @@
     "city": "PHIL",
     "temp_type": "LOW",
     "forecast_mean": 75.2,
-    "actual": null
+    "actual": 73.4
   },
   {
     "date": "2026-07-06",
@@ -256,7 +256,7 @@
     "city": "MIA",
     "temp_type": "LOW",
     "forecast_mean": 80.60000000000001,
-    "actual": null
+    "actual": 77.0
   },
   {
     "date": "2026-07-06",
@@ -284,7 +284,7 @@
     "city": "BOS",
     "temp_type": "LOW",
     "forecast_mean": 69.8,
-    "actual": null
+    "actual": 69.8
   },
   {
     "date": "2026-07-06",
@@ -298,7 +298,7 @@
     "city": "NY",
     "temp_type": "LOW",
     "forecast_mean": 71.96,
-    "actual": null
+    "actual": 71.06
   },
   {
     "date": "2026-07-06",
@@ -311,126 +311,126 @@
     "date": "2026-07-06",
     "city": "HOU",
     "temp_type": "LOW",
-    "forecast_mean": 78.2899,
+    "forecast_mean": 78.4584,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "PHX",
     "temp_type": "LOW",
-    "forecast_mean": 83.98454000000001,
+    "forecast_mean": 84.56546000000002,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "ATL",
     "temp_type": "LOW",
-    "forecast_mean": 73.17546999999999,
+    "forecast_mean": 72.22876,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "OKC",
     "temp_type": "LOW",
-    "forecast_mean": 71.85661999999999,
+    "forecast_mean": 71.94244,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "SEA",
     "temp_type": "LOW",
-    "forecast_mean": 53.14068999999999,
+    "forecast_mean": 54.887570000000004,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "SFO",
     "temp_type": "LOW",
-    "forecast_mean": 55.69803999999999,
+    "forecast_mean": 56.14686000000001,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "PHIL",
     "temp_type": "HIGH",
-    "forecast_mean": 84.98449000000001,
+    "forecast_mean": 81.46176,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "CHI",
     "temp_type": "HIGH",
-    "forecast_mean": 79.50643000000001,
+    "forecast_mean": 78.51463000000001,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "DEN",
     "temp_type": "HIGH",
-    "forecast_mean": 95.96058000000001,
+    "forecast_mean": 96.25488,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "AUS",
     "temp_type": "HIGH",
-    "forecast_mean": 97.4901,
+    "forecast_mean": 97.40146000000001,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "MIA",
     "temp_type": "HIGH",
-    "forecast_mean": 88.5963,
+    "forecast_mean": 89.16124000000002,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "NY",
     "temp_type": "HIGH",
-    "forecast_mean": 74.34026000000001,
+    "forecast_mean": 74.08905,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "HOU",
     "temp_type": "HIGH",
-    "forecast_mean": 94.16033999999999,
+    "forecast_mean": 94.6425,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "PHX",
     "temp_type": "HIGH",
-    "forecast_mean": 110.24983,
+    "forecast_mean": 110.18683999999999,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "ATL",
     "temp_type": "HIGH",
-    "forecast_mean": 87.86143,
+    "forecast_mean": 88.22755999999998,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "OKC",
     "temp_type": "HIGH",
-    "forecast_mean": 92.9591,
+    "forecast_mean": 92.92043000000001,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "SEA",
     "temp_type": "HIGH",
-    "forecast_mean": 80.42053,
+    "forecast_mean": 81.62952,
     "actual": null
   },
   {
     "date": "2026-07-06",
     "city": "SFO",
     "temp_type": "HIGH",
-    "forecast_mean": 63.72156999999999,
+    "forecast_mean": 65.4978,
     "actual": null
   }
 ]

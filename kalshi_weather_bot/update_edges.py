@@ -191,7 +191,14 @@ async def run_update():
     edge_detector = EdgeDetector(config)
     risk_manager = RiskManager(config)
     bias_tracker = BiasTracker(config)
-    bias_offsets = bias_tracker.load_bias_offsets()
+    
+    # Automatically update actuals and compute rolling MOS bias offsets daily
+    logger.info("Updating NWS historical actuals and recalculating rolling MOS bias offsets...")
+    try:
+        bias_offsets = await bias_tracker.update_actuals_and_bias(cities, lookback_days=14)
+    except Exception as e:
+        logger.error(f"Failed to update rolling MOS bias offsets: {e}. Falling back to cached offsets.")
+        bias_offsets = bias_tracker.load_bias_offsets()
     
     await client.initialize()
     

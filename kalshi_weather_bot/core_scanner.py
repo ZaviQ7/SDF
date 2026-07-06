@@ -90,8 +90,8 @@ async def fetch_nws_cli_temp(station_id: str, target_date_str: str, temp_type: s
                         day_num = dt.day
                         year_num = dt.year
                         
-                        # Match MONTH DAY YEAR or MONTH  DAY YEAR (e.g. JULY 5 2026 or JULY  5 2026)
-                        date_pattern = rf"{month_name}\s+{day_num}\s+{year_num}"
+                        # Match FOR MONTH DAY YEAR (e.g. FOR JULY 5 2026 or FOR JULY 05 2026) to avoid matching the header date
+                        date_pattern = rf"FOR\s+{month_name}\s+0?{day_num}\s+{year_num}"
                         if not re.search(date_pattern, product_text.upper()):
                             continue
                             

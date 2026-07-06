@@ -32,29 +32,39 @@ CITY_STATIONS = {}
 
 # fetch_nws_actual_high_low is imported from core_scanner
 
-def evaluate_contract(ticker: str, actual_temp: float) -> bool | None:
+def evaluate_contract(ticker: str, play_desc: str, actual_temp: float) -> bool | None:
     """Evaluate if a weather range contract settled YES (True) or NO (False)."""
-    parts = ticker.split("-")
-    if len(parts) < 3:
+    # 1. Parse target condition from play_desc to resolve threshold direction ambiguity (e.g. <91 vs >=91)
+    rtype, val1, val2 = parse_range(play_desc)
+    if not rtype:
+        # Fallback to ticker parsing if description is missing/malformed
+        parts = ticker.split("-")
+        if len(parts) < 3:
+            return None
+        suffix = parts[-1]
+        temp_type = "HIGH" if "HIGH" in parts[0] else "LOW"
+        actual_rounded = int(round(actual_temp))
+        if suffix.startswith("B"):
+            mid = float(suffix[1:])
+            val1 = int(mid - 0.5)
+            val2 = int(mid + 0.5)
+            return (actual_rounded >= val1) and (actual_rounded <= val2)
+        elif suffix.startswith("T"):
+            val = float(suffix[1:])
+            if temp_type == "HIGH":
+                return actual_rounded >= val
+            else:
+                return actual_rounded <= val
         return None
-    suffix = parts[-1]
-    temp_type = "HIGH" if "HIGH" in parts[0] else "LOW"
-    
+        
     actual_rounded = int(round(actual_temp))
     
-    if suffix.startswith("B"):
-        # Range is Between, e.g. B92.5 -> 92 to 93
-        mid = float(suffix[1:])
-        val1 = int(mid - 0.5)
-        val2 = int(mid + 0.5)
+    if rtype == "between":
         return (actual_rounded >= val1) and (actual_rounded <= val2)
-    elif suffix.startswith("T"):
-        # Range is Threshold, e.g. T101 -> >= 101 (HIGH) or <= 101 (LOW)
-        val = float(suffix[1:])
-        if temp_type == "HIGH":
-            return actual_rounded >= val
-        else:
-            return actual_rounded <= val
+    elif rtype == "greater":
+        return actual_rounded > val1
+    elif rtype == "less":
+        return actual_rounded < val1
     return None
 
 def parse_logged_trades(file_path: str) -> list:
@@ -506,8 +516,13 @@ async def run_update():
             total = cost + fee
             payout = size * 1.00
             
+            parts = ticker.split("-")
+            market_series_prefix = parts[0].lower()
+            event_ticker_prefix = "-".join(parts[:2]).lower()
+            kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
+            
             play_desc = f"**Buy {side}** {ne['title'].split(' be ')[1].split(' on ')[0]} @ {int(price*100)}¢"
-            location_line = f"**{city} {ttype.capitalize()}** ([NOAA Link]({nws_link}))<br>`{ticker}`"
+            location_line = f"**{city} {ttype.capitalize()}** ([NOAA Link]({nws_link}) | [Kalshi Link]({kalshi_url}))<br>`{ticker}`"
             total_cost_line = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
             
             logged_trades.append({
@@ -550,16 +565,22 @@ async def run_update():
             
             # Skip settlement if target date is not in the past relative to local timezone
             tz = pytz.timezone(timezone_str)
-            local_today = datetime.now(tz).strftime("%Y-%m-%d")
-            if trade_date_str >= local_today:
-                logger.info(f"Skipping auto-settlement for {t['ticker']}: Target date {trade_date_str} is not in the past (local today: {local_today})")
+            local_dt = datetime.now(tz)
+            local_today = local_dt.strftime("%Y-%m-%d")
+            
+            # Allow settlement on the same day if it's after 9 PM (21:00) local time (high/low are already fully determined)
+            is_past = trade_date_str < local_today
+            is_same_day_late = (trade_date_str == local_today and local_dt.hour >= 21)
+            
+            if not (is_past or is_same_day_late):
+                logger.info(f"Skipping auto-settlement for {t['ticker']}: Target date {trade_date_str} is today and it's before 9 PM local time (current: {local_dt.hour}:00).")
                 continue
                 
             # Fetch actual temp
             actual_temp = await fetch_nws_actual_high_low(station_id, trade_date_str, timezone_str, temp_type)
             if actual_temp is not None:
                 # Settle contract
-                result = evaluate_contract(t["ticker"], actual_temp)
+                result = evaluate_contract(t["ticker"], t["play_desc"], actual_temp)
                 if result is not None:
                     # Calculate cost and payouts
                     cost_match = re.search(r"\(\$([\d\.]+)\s+total\)", t["total_cost_line"])
@@ -578,6 +599,21 @@ async def run_update():
                         t["status"] = f"✅ **Won (+${net_profit:.2f})**"
                     else:
                         t["status"] = f"❌ **Lost (-${cost:.2f})**"
+                        
+                    # Add exact Kalshi market link when settling if not already present
+                    ticker = t["ticker"]
+                    parts = ticker.split("-")
+                    if len(parts) >= 2:
+                        market_series_prefix = parts[0].lower()
+                        event_ticker_prefix = "-".join(parts[:2]).lower()
+                        kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
+                        if "Kalshi Link" not in t["location_line"]:
+                            t["location_line"] = re.sub(
+                                r"(\[NOAA Link\]\([^\)]+\))",
+                                r"\1 | [Kalshi Link](" + kalshi_url + ")",
+                                t["location_line"]
+                            )
+                            
                     logger.info(f"Auto-settled trade {t['ticker']} on {trade_date_str}: {t['status']}")
 
     # 4. Separate active (Open) and historical (Won/Lost)

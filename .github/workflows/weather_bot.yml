@@ -1,11 +1,6 @@
 name: Run Weather Bot Schedule
 
 on:
-  schedule:
-    # 10:00 AM EDT -> 14:00 UTC
-    - cron: '0 14 * * *'
-    # 11:00 PM EDT -> 03:00 UTC (next day)
-    - cron: '0 3 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub web UI
 
 jobs:

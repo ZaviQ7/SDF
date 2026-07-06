@@ -129,28 +129,31 @@ class BiasTracker:
         history = self.load_history()
         updated = False
         
-        # We look for yesterday's date relative to the local time of each city
-        for city in cities:
-            city_code = city["code"]
-            station = city["nws_station_id"]
-            tz_str = city["timezone"]
-            
-            tz = pytz.timezone(tz_str)
-            local_yesterday = (datetime.now(tz) - timedelta(days=1)).strftime("%Y-%m-%d")
-            
-            for temp_type in ["HIGH", "LOW"]:
-                # Find matching history entry
-                for entry in history:
-                    if (entry["city"] == city_code and 
-                        entry["temp_type"] == temp_type and 
-                        entry["date"] == local_yesterday and 
-                        entry["actual"] is None):
-                        
-                        # Fetch NWS actual observed High/Low
-                        actual_val = await self.fetch_yesterday_actual(station, local_yesterday, tz_str, temp_type)
-                        if actual_val is not None:
-                            entry["actual"] = actual_val
-                            updated = True
+        # Scan history to fill missing actuals for any past dates in log
+        for entry in history:
+            if entry["actual"] is None:
+                city_code = entry["city"]
+                city = next((c for c in cities if c["code"] == city_code), None)
+                if not city:
+                    continue
+                    
+                target_date = entry["date"]
+                station = city["nws_station_id"]
+                tz_str = city["timezone"]
+                temp_type = entry["temp_type"]
+                
+                # Check if target date is in the past relative to local timezone
+                tz = pytz.timezone(tz_str)
+                local_today = datetime.now(tz).strftime("%Y-%m-%d")
+                if target_date >= local_today:
+                    continue
+                    
+                # Fetch NWS actual observed High/Low
+                actual_val = await self.fetch_yesterday_actual(station, target_date, tz_str, temp_type)
+                if actual_val is not None:
+                    entry["actual"] = actual_val
+                    updated = True
+                    await asyncio.sleep(0.5) # Rate limit pacing protection
                             
         if updated:
             self.save_history(history)

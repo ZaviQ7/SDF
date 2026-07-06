@@ -22,8 +22,8 @@ from src.utils.helpers import parse_range, calculate_maker_fee
 from src.utils.bias_tracker import BiasTracker
 from core_scanner import get_forecasts_for_date, fetch_nws_actual_high_low
 
-# Suppress debug logs
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("updater")
 logger.setLevel(logging.INFO)
 

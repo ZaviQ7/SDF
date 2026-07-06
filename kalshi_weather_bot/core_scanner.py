@@ -435,9 +435,9 @@ async def run_scan(
                             f"  Skipping {city_name} today HIGH (past 3PM local)."
                         )
                         continue
-                    if temp_type == "LOW" and local_hour >= 7:
+                    if temp_type == "LOW" and local_hour >= 3:
                         logger.info(
-                            f"  Skipping {city_name} today LOW (past 7AM local)."
+                            f"  Skipping {city_name} today LOW (past 3AM local)."
                         )
                         continue
 

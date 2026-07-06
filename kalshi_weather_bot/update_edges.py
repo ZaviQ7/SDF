@@ -317,7 +317,7 @@ async def run_update():
                     local_hour = local_now.hour
                     if temp_type == "HIGH" and local_hour >= 15:
                         continue
-                    if temp_type == "LOW" and local_hour >= 7:
+                    if temp_type == "LOW" and local_hour >= 3:
                         continue
                         
                 markets = await client.get_weather_markets(prefix)

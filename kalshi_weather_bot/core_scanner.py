@@ -12,6 +12,7 @@ import yaml
 import pytz
 import aiohttp
 import numpy as np
+import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Callable
 
@@ -53,10 +54,74 @@ def _set_cached(key: str, data: Any):
 # ---------------------------------------------------------------------------
 # NWS observation fetcher (single canonical implementation)
 # ---------------------------------------------------------------------------
+async def fetch_nws_cli_temp(station_id: str, target_date_str: str, temp_type: str) -> Optional[float]:
+    """Fetch official daily high/low temperature from NWS Daily Climate Summary (CLI) text product."""
+    cli_code = station_id[1:] if station_id.startswith("K") else station_id
+    url = f"https://api.weather.gov/products/types/CLI/locations/{cli_code}"
+    headers = {"User-Agent": "KalshiWeatherBot/1.0 (contact@kalshiedgebot.com)"}
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+                graph = data.get("@graph", [])
+                if not graph:
+                    return None
+                
+                # Scan the latest 3 climate products to find the one matching target_date_str
+                for product_entry in graph[:3]:
+                    product_id = product_entry.get("@id")
+                    if not product_id:
+                        continue
+                        
+                    async with session.get(product_id, headers=headers, timeout=10) as prod_resp:
+                        if prod_resp.status != 200:
+                            continue
+                        prod_data = await prod_resp.json()
+                        product_text = prod_data.get("productText", "")
+                        if not product_text:
+                            continue
+                            
+                        # Verify the date in the product text
+                        dt = datetime.strptime(target_date_str, "%Y-%m-%d")
+                        month_name = dt.strftime("%B").upper()
+                        day_num = dt.day
+                        year_num = dt.year
+                        
+                        # Match MONTH DAY YEAR or MONTH  DAY YEAR (e.g. JULY 5 2026 or JULY  5 2026)
+                        date_pattern = rf"{month_name}\s+{day_num}\s+{year_num}"
+                        if not re.search(date_pattern, product_text.upper()):
+                            continue
+                            
+                        # Parse MAXIMUM or MINIMUM value
+                        if temp_type == "HIGH":
+                            m_max = re.search(r"MAXIMUM\s+(\d+)", product_text.upper())
+                            if m_max:
+                                val = float(m_max.group(1))
+                                logger.info(f"🏆 Found official NWS CLI HIGH for {station_id} on {target_date_str}: {val}F")
+                                return val
+                        else:
+                            m_min = re.search(r"MINIMUM\s+(\d+)", product_text.upper())
+                            if m_min:
+                                val = float(m_min.group(1))
+                                logger.info(f"🏆 Found official NWS CLI LOW for {station_id} on {target_date_str}: {val}F")
+                                return val
+    except Exception as e:
+        logger.error(f"Error fetching NWS CLI temp for {station_id}: {e}")
+    return None
+
 async def fetch_nws_actual_high_low(
     station_id: str, target_date_str: str, timezone_str: str, temp_type: str
 ) -> Optional[float]:
     """Query NWS observations for today's running high or low temperature."""
+    # 1. First attempt to fetch the official Daily Climate Summary (CLI) for precise settlement matching
+    cli_temp = await fetch_nws_cli_temp(station_id, target_date_str, temp_type)
+    if cli_temp is not None:
+        return cli_temp
+        
+    # 2. Fall back to raw hourly observations (useful for running/incomplete days)
     url = f"https://api.weather.gov/stations/{station_id}/observations"
     headers = {"User-Agent": "KalshiWeatherBot/1.0 (contact@kalshiedgebot.com)"}
 

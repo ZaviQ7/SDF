@@ -17,9 +17,31 @@ class BiasTracker:
         self.config = config
         self.log_file = "data/historical/forecasts_log.json"
         self.offsets_file = "data/historical/bias_offsets.json"
+        self.cache_file = "data/historical/actuals_cache.json"
         
         # Create directories if they don't exist
         os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
+        self.actuals_cache = self.load_actuals_cache()
+        
+    def load_actuals_cache(self) -> Dict[str, float]:
+        """Load NWS actual daily temperatures cache from disk."""
+        if not os.path.exists(self.cache_file):
+            return {}
+        try:
+            with open(self.cache_file, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading actuals cache: {e}")
+            return {}
+            
+    def save_actuals_cache(self):
+        """Save NWS actual daily temperatures cache to disk."""
+        try:
+            os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
+            with open(self.cache_file, "w") as f:
+                json.dump(self.actuals_cache, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving actuals cache: {e}")
         
     def load_history(self) -> List[Dict[str, Any]]:
         """Load prediction history from disk."""
@@ -72,53 +94,21 @@ class BiasTracker:
         temp_type: str
     ) -> Optional[float]:
         """
-        Query NWS hourly observations for a target date, convert to local time,
-        and find the actual daily High or Low.
+        Query NWS Daily Climate Summary (CLI) or hourly observations for a target date.
+        Uses the dynamic CLI-first canonical function from core_scanner and caches the result.
         """
-        url = f"https://api.weather.gov/stations/{station_id}/observations"
-        headers = {"User-Agent": "KalshiWeatherBot/1.0 (contact@kalshiedgebot.com)"}
-        
-        logger.info(f"Fetching actual observed temperatures for {station_id} on {target_date_str}...")
-        
+        cache_key = f"{station_id}_{target_date_str}_{temp_type}"
+        if cache_key in self.actuals_cache:
+            logger.debug(f"Cache hit for {cache_key}: {self.actuals_cache[cache_key]}F")
+            return self.actuals_cache[cache_key]
+            
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=12) as resp:
-                    if resp.status != 200:
-                        logger.warning(f"Failed to fetch NWS observations for {station_id} ({resp.status})")
-                        return None
-                        
-                    data = await resp.json()
-                    features = data.get("features", [])
-                    if not features:
-                        return None
-                        
-                    tz = pytz.timezone(timezone_str)
-                    local_temps = []
-                    
-                    for f in features:
-                        props = f.get("properties", {})
-                        timestamp_str = props.get("timestamp")
-                        temp_c = props.get("temperature", {}).get("value")
-                        
-                        if timestamp_str and temp_c is not None:
-                            # Parse UTC time and convert to local time
-                            utc_dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-                            local_dt = utc_dt.astimezone(tz)
-                            
-                            # Check if the observation date matches our target local date
-                            if local_dt.strftime("%Y-%m-%d") == target_date_str:
-                                temp_f = temp_c * 9/5 + 32
-                                local_temps.append(temp_f)
-                                
-                    if not local_temps:
-                        logger.warning(f"No NWS hourly temperatures found matching target local date {target_date_str} for station {station_id}")
-                        return None
-                        
-                    # Calculate true High or Low
-                    actual_val = max(local_temps) if temp_type == "HIGH" else min(local_temps)
-                    logger.info(f"✅ Found {temp_type} actual for {station_id} on {target_date_str}: {actual_val:.1f}°F (from {len(local_temps)} observations)")
-                    return float(actual_val)
-                    
+            from core_scanner import fetch_nws_actual_high_low
+            val = await fetch_nws_actual_high_low(station_id, target_date_str, timezone_str, temp_type)
+            if val is not None:
+                self.actuals_cache[cache_key] = val
+                self.save_actuals_cache()
+            return val
         except Exception as e:
             logger.error(f"Error fetching actuals for {station_id}: {e}")
         return None

@@ -202,13 +202,20 @@ async def run_update():
     risk_manager = RiskManager(config)
     bias_tracker = BiasTracker(config)
     
+    import sys
+    settle_only = "--settle-only" in sys.argv
+    
     # Automatically update actuals and compute rolling MOS bias offsets daily
-    logger.info("Updating NWS historical actuals and recalculating rolling MOS bias offsets...")
-    try:
-        bias_offsets = await bias_tracker.update_actuals_and_bias(cities, lookback_days=14)
-    except Exception as e:
-        logger.error(f"Failed to update rolling MOS bias offsets: {e}. Falling back to cached offsets.")
-        bias_offsets = bias_tracker.load_bias_offsets()
+    if settle_only:
+        logger.info("Skipping rolling MOS bias offset recalculation in SETTLE-ONLY mode.")
+        bias_offsets = {}
+    else:
+        logger.info("Updating NWS historical actuals and recalculating rolling MOS bias offsets...")
+        try:
+            bias_offsets = await bias_tracker.update_actuals_and_bias(cities, lookback_days=14)
+        except Exception as e:
+            logger.error(f"Failed to update rolling MOS bias offsets: {e}. Falling back to cached offsets.")
+            bias_offsets = bias_tracker.load_bias_offsets()
     
     await client.initialize()
     
@@ -225,7 +232,13 @@ async def run_update():
     live_market_stats = {}
     cached_pooled_temps = {}
     
-    for city in cities:
+    if settle_only:
+        logger.info("Running in SETTLE-ONLY mode. Skipping forecast model downloads and new edge scanning.")
+        cities_to_scan = []
+    else:
+        cities_to_scan = cities
+        
+    for city in cities_to_scan:
         if not city.get("active", True):
             continue
             
@@ -377,7 +390,7 @@ async def run_update():
                     
                 edges = edge_detector.find_edges(date_markets, model_probabilities)
                 for edge in edges:
-                    if edge["model_prob"] > 0.53 and edge["net_ev"] > 0.0:
+                    if edge["model_prob"] > 0.54 and edge["net_ev"] > 0.15:
                         edge["city"] = city_name
                         edge["temp_type"] = temp_type
                         edge["formatted_date"] = date_formatted_str
@@ -386,7 +399,8 @@ async def run_update():
                         edge["suggested_size"] = size if size > 0 else 1
                         new_edges.append(edge)
                     
-    await client.close()
+    if not settle_only:
+        await client.close()
     
     # 2.1 Update existing open weather trades with current live stats
     logger.info("Updating existing open weather trades with live stats...")
@@ -419,7 +433,7 @@ async def run_update():
                 current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                     
                 # Keep the trade ONLY if true prob > 53% AND EV > 0%
-                if prob_play > 0.53 and current_ev > 0.0:
+                if prob_play > 0.54 and current_ev > 0.15:
                     size = t["qty"]
                     cost = current_price * size
                     fee = calculate_maker_fee(current_price, size)
@@ -482,7 +496,7 @@ async def run_update():
                                 cost_unit = current_price + fee_unit
                                 current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                                 
-                                if prob_play > 0.53 and current_ev > 0.0:
+                                if prob_play > 0.54 and current_ev > 0.15:
                                     t["true_prob"] = f"{prob_play:.1%}"
                                     t["net_ev"] = f"{current_ev:>+6.1%}"
                                     updated_logged_trades.append(t)
@@ -522,7 +536,7 @@ async def run_update():
             kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
             
             play_desc = f"**Buy {side}** {ne['title'].split(' be ')[1].split(' on ')[0]} @ {int(price*100)}¢"
-            location_line = f"**{city} {ttype.capitalize()}** ([NOAA Link]({nws_link}) | [Kalshi Link]({kalshi_url}))<br>`{ticker}`"
+            location_line = f"**{city} {ttype.capitalize()}** ([NOAA Link]({nws_link}) • [Kalshi Link]({kalshi_url}))<br>`{ticker}`"
             total_cost_line = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
             
             logged_trades.append({

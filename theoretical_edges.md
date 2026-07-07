@@ -3,17 +3,17 @@
 Use this file to log and track your +EV trades, expected probabilities, and actual outcomes to verify your edge.
 
 ## 📊 Running Performance Summary
-*   **Total Trades Logged:** 71
-*   **Win/Loss Record:** 46 wins / 25 losses
-*   **Total Capital Risked:** $124.95
-*   **Total Payout:** $146.00
-*   **Net Profit:** +$21.05 (ROI: 16.8%)
+*   **Total Trades Logged:** 74
+*   **Win/Loss Record:** 47 wins / 27 losses
+*   **Total Capital Risked:** $131.47
+*   **Total Payout:** $147.00
+*   **Net Profit:** +$15.53 (ROI: 11.8%)
 
 ### 📅 Daily Performance History
 
 | Date | Win / Loss | Risked | Payout | Net PnL | ROI |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Jul 06, 2026 | 8 W / 3 L | $24.22 | $39.00 | +$14.78 | 61.0% |
+| Jul 06, 2026 | 9 W / 5 L | $30.74 | $40.00 | +$9.26 | 30.1% |
 | Jul 05, 2026 | 23 W / 17 L | $67.23 | $61.00 | $-6.23 | -9.3% |
 | Jul 04, 2026 | 7 W / 3 L | $17.60 | $17.00 | $-0.60 | -3.4% |
 | Jul 03, 2026 | 8 W / 2 L | $15.90 | $29.00 | +$13.10 | 82.4% |
@@ -51,22 +51,14 @@ Use this file to log and track your +EV trades, expected probabilities, and actu
 
 ---
 
-## 🔮 Active Weather Edges for Jul 06, 2026
-*These represent active predictions for Jul 06, 2026. Spreads and EV are live as of generating.*
-
-| Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Jul 06, 2026 | **Seattle High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSEA.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsea/a/kxhightsea-26jul06))<br>`KXHIGHTSEA-26JUL06-B83.5` | **Buy NO** 83-84° @ 38¢ | 1 | $0.38 + $0.01 fee<br>**($0.39 total)** | 92.0% | +135.8% | $1.00 | **Open** / *Pending* |
-| Jul 06, 2026 | **San Francisco High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsfo/a/kxhightsfo-26jul06))<br>`KXHIGHTSFO-26JUL06-B68.5` | **Buy NO** 68-69° @ 43¢ | 6 | $2.58 + $0.03 fee<br>**($2.61 total)** | 96.9% | +120.2% | $6.00 | **Open** / *Pending* |
-| Jul 06, 2026 | **Phoenix High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxhightphx/a/kxhightphx-26jul06))<br>`KXHIGHTPHX-26JUL06-B113.5` | **Buy NO** 113-114° @ 70¢ | 5 | $3.50 + $0.02 fee<br>**($3.52 total)** | 99.0% | +39.4% | $5.00 | **Open** / *Pending* |
-
----
-
 ## 📜 Historical Weather Trades (Settled Outcomes)
 *These represent past days' resolved outcomes, verified against official NOAA weather observations.*
 
 | Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Jul 06, 2026 | **Seattle High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSEA.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsea/a/kxhightsea-26jul06))<br>`KXHIGHTSEA-26JUL06-B83.5` | **Buy NO** 83-84° @ 38¢ | 1 | $0.38 + $0.01 fee<br>**($0.39 total)** | 92.0% | +135.8% | $1.00 | ✅ **Won (+$0.61)** |
+| Jul 06, 2026 | **San Francisco High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsfo/a/kxhightsfo-26jul06))<br>`KXHIGHTSFO-26JUL06-B68.5` | **Buy NO** 68-69° @ 43¢ | 6 | $2.58 + $0.03 fee<br>**($2.61 total)** | 96.9% | +120.2% | $6.00 | ❌ **Lost (-$2.61)** |
+| Jul 06, 2026 | **Phoenix High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxhightphx/a/kxhightphx-26jul06))<br>`KXHIGHTPHX-26JUL06-B113.5` | **Buy NO** 113-114° @ 70¢ | 5 | $3.50 + $0.02 fee<br>**($3.52 total)** | 99.0% | +39.4% | $5.00 | ❌ **Lost (-$3.52)** |
 | Jul 06, 2026 | **Miami High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KMIA.html) • [Kalshi Link](https://kalshi.com/markets/kxhighmia/a/kxhighmia-26jul06))<br>`KXHIGHMIA-26JUL06-B89.5` | **Buy YES** 89-90° @ 26¢ | 9 | $2.34 + $0.04 fee<br>**($2.38 total)** | 64.1% | +137.6% | $9.00 | ❌ **Lost (-$2.38)** |
 | Jul 06, 2026 | **Miami High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KMIA.html) • [Kalshi Link](https://kalshi.com/markets/kxhighmia/a/kxhighmia-26jul06))<br>`KXHIGHMIA-26JUL06-B91.5` | **Buy NO** 91-92° @ 38¢ | 6 | $2.28 + $0.03 fee<br>**($2.31 total)** | 92.3% | +136.8% | $6.00 | ✅ **Won (+$3.69)** |
 | Jul 06, 2026 | **Austin High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KAUS.html) • [Kalshi Link](https://kalshi.com/markets/kxhighaus/a/kxhighaus-26jul06))<br>`KXHIGHAUS-26JUL06-B96.5` | **Buy NO** 96-97° @ 41¢ | 6 | $2.46 + $0.03 fee<br>**($2.49 total)** | 75.7% | +80.3% | $6.00 | ✅ **Won (+$3.51)** |

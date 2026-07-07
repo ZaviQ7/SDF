@@ -406,7 +406,7 @@ async def run_update():
         if "Open" in t["status"]:
             if ticker in live_market_stats:
                 stats = live_market_stats[ticker]
-                side = "YES" if "YES" in t["play_desc"] else "NO"
+                side = "YES" if "Buy YES" in t["play_desc"] else "NO"
                 
                 yes_bid = stats["yes_bid"]
                 yes_ask = stats["yes_ask"]
@@ -611,7 +611,7 @@ async def run_update():
                     est_payout = float(payout_match.group(1)) if payout_match else 0.0
                     
                     # Settle
-                    side = "YES" if "YES" in t["play_desc"] else "NO"
+                    side = "YES" if "Buy YES" in t["play_desc"] else "NO"
                     # If result is True, YES wins. If result is False, NO wins.
                     contract_won = (result and side == "YES") or (not result and side == "NO")
                     

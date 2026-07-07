@@ -76,8 +76,10 @@ Physical models suffer from systematic localized biases due to station altitude 
 2.  **Tracking:** Settled forecast means are compared against NWS actual values in `forecasts_log.json`.
 3.  **Rolling Bias Window:** For each station and temperature type (High/Low), the tracker extracts the last **14 days** of forecasts. It requires a **minimum of 3 days** of matching historical data to avoid reacting to one-off anomalies.
 4.  **Offset Calculation:**
-    $$\text{Bias Offset} = \frac{1}{N} \sum_{i=1}^{N} \left( \text{Actual Temp}_{i} - \text{Forecast Mean}_{i} \right)$$
-    This offset (e.g. $+3.75^\circ\text{F}$ for Miami High) is added to all raw ensemble member predictions during the next run, dynamically adjusting the forecast distribution.
+
+$$\text{Bias Offset} = \frac{1}{N} \sum_{i=1}^{N} \left( \text{Actual Temp}_i - \text{Forecast Mean}_i \right)$$
+
+This offset (e.g. $+3.75^\circ\text{F}$ for Miami High) is added to all raw ensemble member predictions during the next run, dynamically adjusting the forecast distribution.
 
 ---
 

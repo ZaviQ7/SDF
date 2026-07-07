@@ -526,6 +526,14 @@ async def run_update():
             kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
             
             play_desc = f"**Buy {side}** {ne['title'].split(' be ')[1].split(' on ')[0]} @ {int(price*100)}¢"
+            
+            # Add correlation / mutual exclusivity warnings to action description
+            if ne.get("overlapping_yes"):
+                play_desc += "<br>⚠️ *Overlapping YES Play*"
+            elif ne.get("group_no_count", 1) > 1:
+                no_count = ne["group_no_count"]
+                play_desc += f"<br>⚠️ *Correlated NO (Scaled 1/{no_count})*"
+                
             location_line = f"**{city} {ttype.capitalize()}** ([NOAA Link]({nws_link}) • [Kalshi Link]({kalshi_url}))<br>`{ticker}`"
             total_cost_line = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
             

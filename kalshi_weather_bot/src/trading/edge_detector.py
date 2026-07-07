@@ -136,28 +136,26 @@ class EdgeDetector:
                 groups[event_key] = {"yes": [], "no": []}
             groups[event_key][edge["side"]].append(edge)
             
-        filtered_edges = []
+        annotated_edges = []
         for event_key, side_dict in groups.items():
             yes_list = side_dict["yes"]
             no_list = side_dict["no"]
             
-            # 1. For YES bets: Keep ONLY the single YES bet with the highest Net EV% (mutually exclusive)
+            # 1. For YES bets: Keep all, but tag overlapping ones for visibility
             if yes_list:
-                yes_list.sort(key=lambda x: x["net_ev"], reverse=True)
-                filtered_edges.append(yes_list[0])
-                if len(yes_list) > 1:
-                    for discarded in yes_list[1:]:
-                        logger.info(
-                            f"Filtering out mutually exclusive YES bet: {discarded['ticker']} (EV: {discarded['net_ev']:+.1%}) "
-                            f"in favor of {yes_list[0]['ticker']} (EV: {yes_list[0]['net_ev']:+.1%})"
-                        )
+                for edge in yes_list:
+                    edge["group_yes_count"] = len(yes_list)
+                    edge["overlapping_yes"] = len(yes_list) > 1
+                    annotated_edges.append(edge)
+                    if len(yes_list) > 1:
+                        logger.info(f"Tagging overlapping YES play: {edge['ticker']} (Group YES count: {len(yes_list)})")
                         
             # 2. For NO bets: Keep all (negatively correlated), but tag with group_no_count for scaled sizing
             if no_list:
                 for edge in no_list:
                     edge["group_no_count"] = len(no_list)
-                    filtered_edges.append(edge)
+                    annotated_edges.append(edge)
                     
-        # Sort final filtered edges by EV magnitude (descending)
-        filtered_edges.sort(key=lambda x: x["net_ev"], reverse=True)
-        return filtered_edges
+        # Sort final annotated edges by EV magnitude (descending)
+        annotated_edges.sort(key=lambda x: x["net_ev"], reverse=True)
+        return annotated_edges

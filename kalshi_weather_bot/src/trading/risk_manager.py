@@ -74,6 +74,12 @@ class RiskManager:
         # Suggested capital risk in dollars
         suggested_capital_risk = adjusted_kelly * self.bankroll
         
+        # Scale capital risk for negatively correlated NO bets in the same event group
+        no_count = edge.get("group_no_count", 1)
+        if edge.get("side") == "no" and no_count > 1:
+            suggested_capital_risk = suggested_capital_risk / no_count
+            logger.info(f"Risk Info: Scaling down risk for correlated NO bet {edge['ticker']} by 1/{no_count}")
+            
         # Suggested size in contracts (floor)
         suggested_size = int(suggested_capital_risk / price)
         

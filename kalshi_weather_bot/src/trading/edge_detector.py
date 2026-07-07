@@ -121,6 +121,43 @@ class EdgeDetector:
                 })
                 logger.info(f"🎯 Edge detected: {ticker} NO | Entry: {no_entry:.2f} | Model: {1.0 - model_prob:.1%} | EV: {no_ev_pct:+.1%}")
                 
-        # Sort by EV magnitude (descending)
-        edges.sort(key=lambda x: x["net_ev"], reverse=True)
-        return edges
+        # Group edges by event key (prefix, date_code) to handle cross-bracket correlation
+        groups = {}
+        for edge in edges:
+            parts = edge["ticker"].split("-")
+            if len(parts) >= 2:
+                prefix = parts[0]
+                date_code = parts[1]
+                event_key = (prefix, date_code)
+            else:
+                event_key = (edge["ticker"], "")
+                
+            if event_key not in groups:
+                groups[event_key] = {"yes": [], "no": []}
+            groups[event_key][edge["side"]].append(edge)
+            
+        filtered_edges = []
+        for event_key, side_dict in groups.items():
+            yes_list = side_dict["yes"]
+            no_list = side_dict["no"]
+            
+            # 1. For YES bets: Keep ONLY the single YES bet with the highest Net EV% (mutually exclusive)
+            if yes_list:
+                yes_list.sort(key=lambda x: x["net_ev"], reverse=True)
+                filtered_edges.append(yes_list[0])
+                if len(yes_list) > 1:
+                    for discarded in yes_list[1:]:
+                        logger.info(
+                            f"Filtering out mutually exclusive YES bet: {discarded['ticker']} (EV: {discarded['net_ev']:+.1%}) "
+                            f"in favor of {yes_list[0]['ticker']} (EV: {yes_list[0]['net_ev']:+.1%})"
+                        )
+                        
+            # 2. For NO bets: Keep all (negatively correlated), but tag with group_no_count for scaled sizing
+            if no_list:
+                for edge in no_list:
+                    edge["group_no_count"] = len(no_list)
+                    filtered_edges.append(edge)
+                    
+        # Sort final filtered edges by EV magnitude (descending)
+        filtered_edges.sort(key=lambda x: x["net_ev"], reverse=True)
+        return filtered_edges

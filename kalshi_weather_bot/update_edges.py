@@ -426,25 +426,23 @@ async def run_update():
                 cost_unit = current_price + fee_unit
                 current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                     
-                # Keep the trade ONLY if true prob > 53% AND EV > 0%
-                if prob_play > 0.54 and current_ev > 0.15:
-                    size = t["qty"]
-                    cost = current_price * size
-                    fee = calculate_maker_fee(current_price, size)
-                    total = cost + fee
-                    payout = size * 1.00
-                    
-                    try:
-                        t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
-                    except Exception:
-                        pass
-                    t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
-                    t["true_prob"] = f"{prob_play:.1%}"
-                    t["net_ev"] = f"{current_ev:>+6.1%}"
-                    t["est_payout"] = f"${payout:.2f}"
-                    updated_logged_trades.append(t)
-                else:
-                    logger.info(f"Removing open trade {ticker} from log: True Prob ({prob_play:.1%}) <= 53% or EV ({current_ev:+.1%}) <= 0%")
+                # Always keep existing open trades so they can be tracked, but update their live metrics
+                size = t["qty"]
+                cost = current_price * size
+                fee = calculate_maker_fee(current_price, size)
+                total = cost + fee
+                payout = size * 1.00
+                
+                try:
+                    t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
+                except Exception:
+                    pass
+                t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
+                t["true_prob"] = f"{prob_play:.1%}"
+                t["net_ev"] = f"{current_ev:>+6.1%}"
+                t["est_payout"] = f"${payout:.2f}"
+                updated_logged_trades.append(t)
+                logger.info(f"Updated live open trade {ticker}: Prob {prob_play:.1%}, EV {current_ev:+.1%}")
             else:
                 # If ticker is closed on Kalshi, evaluate using cached pooled forecast
                 parts = ticker.split("-")
@@ -490,13 +488,11 @@ async def run_update():
                                 cost_unit = current_price + fee_unit
                                 current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                                 
-                                if prob_play > 0.54 and current_ev > 0.15:
-                                    t["true_prob"] = f"{prob_play:.1%}"
-                                    t["net_ev"] = f"{current_ev:>+6.1%}"
-                                    updated_logged_trades.append(t)
-                                    logger.info(f"Updated closed open trade {ticker}: Prob {prob_play:.1%}, EV {current_ev:+.1%}")
-                                else:
-                                    logger.info(f"Removing closed open trade {ticker} from log: True Prob ({prob_play:.1%}) <= 53% or EV ({current_ev:+.1%}) <= 0%")
+                                # Always keep existing closed open trades, but update their live metrics
+                                t["true_prob"] = f"{prob_play:.1%}"
+                                t["net_ev"] = f"{current_ev:>+6.1%}"
+                                updated_logged_trades.append(t)
+                                logger.info(f"Updated closed open trade {ticker}: Prob {prob_play:.1%}, EV {current_ev:+.1%}")
                                 continue
                 updated_logged_trades.append(t)
         else:

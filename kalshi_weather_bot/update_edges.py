@@ -249,6 +249,7 @@ async def run_update():
     # Scan tomorrow's new edges
     new_edges = []
     live_market_stats = {}
+    detected_edges_registry = {}
     cached_pooled_temps = {}
     
     if settle_only:
@@ -384,6 +385,7 @@ async def run_update():
                     
                 edges = edge_detector.find_edges(date_markets, model_probabilities)
                 for edge in edges:
+                    detected_edges_registry[edge["ticker"]] = edge
                     if edge["model_prob"] > 0.54 and edge["net_ev"] > 0.15:
                         edge["city"] = city_name
                         edge["temp_type"] = temp_type
@@ -434,7 +436,14 @@ async def run_update():
                 payout = size * 1.00
                 
                 try:
-                    t["play_desc"] = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
+                    play_desc = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
+                    edge_info = detected_edges_registry.get(ticker, {})
+                    if edge_info.get("overlapping_yes"):
+                        play_desc += "<br>⚠️ *Overlapping YES Play*"
+                    elif edge_info.get("group_no_count", 1) > 1:
+                        no_count = edge_info["group_no_count"]
+                        play_desc += f"<br>⚠️ *Correlated NO (Scaled 1/{no_count})*"
+                    t["play_desc"] = play_desc
                 except Exception:
                     pass
                 t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"

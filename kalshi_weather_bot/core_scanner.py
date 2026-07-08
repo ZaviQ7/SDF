@@ -177,12 +177,12 @@ async def download_ensemble(
     )
     headers = {"User-Agent": "Mozilla/5.0 (kalshi-ev-scanner-v2)"}
 
-    max_retries = 3
-    backoff = 2.0
+    max_retries = 2
+    backoff = 1.5
     for attempt in range(max_retries):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=15, headers=headers) as resp:
+                async with session.get(url, timeout=8, headers=headers) as resp:
                     if resp.status == 429:
                         logger.warning(
                             f"Rate limited (429) for {model_name}. Retrying in {backoff}s..."
@@ -266,7 +266,7 @@ async def download_hrrr(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=12) as resp:
+            async with session.get(url, headers=headers, timeout=8) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     hourly = data.get("hourly", {})
@@ -306,57 +306,55 @@ async def get_forecasts_for_date(
     lat: float, lon: float, target_date: str, timezone_str: str
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """Retrieve and cache GFS, ECMWF, ICON, GEM, and HRRR forecasts for a given coordinate & date."""
-    # 1. ecmwf
-    ecmwf_key = _cache_key("ecmwf_ifs025_ensemble", lat, lon, target_date)
-    ecmwf = _get_cached(ecmwf_key)
-    if ecmwf is None:
-        ecmwf = await download_ensemble("ecmwf_ifs025_ensemble", lat, lon, target_date, timezone_str)
-        if ecmwf:
-            _set_cached(ecmwf_key, ecmwf)
-        await asyncio.sleep(0.3)
+    # Define models to download
+    ensemble_models = [
+        ("ecmwf", "ecmwf_ifs025_ensemble"),
+        ("gfs", "gfs_seamless"),
+        ("icon", "icon_seamless"),
+        ("gem", "gem_global"),
+    ]
 
-    # 2. gfs
-    gfs_key = _cache_key("gfs_seamless", lat, lon, target_date)
-    gfs = _get_cached(gfs_key)
-    if gfs is None:
-        gfs = await download_ensemble("gfs_seamless", lat, lon, target_date, timezone_str)
-        if gfs:
-            _set_cached(gfs_key, gfs)
-        await asyncio.sleep(0.3)
+    # Check cache first, build list of tasks for uncached models
+    results = {}
+    tasks = []
+    task_keys = []
 
-    # 3. icon
-    icon_key = _cache_key("icon_seamless", lat, lon, target_date)
-    icon = _get_cached(icon_key)
-    if icon is None:
-        icon = await download_ensemble("icon_seamless", lat, lon, target_date, timezone_str)
-        if icon:
-            _set_cached(icon_key, icon)
-        await asyncio.sleep(0.3)
+    for short_name, model_name in ensemble_models:
+        key = _cache_key(model_name, lat, lon, target_date)
+        cached = _get_cached(key)
+        if cached is not None:
+            results[short_name] = cached
+        else:
+            tasks.append(download_ensemble(model_name, lat, lon, target_date, timezone_str))
+            task_keys.append((short_name, key))
 
-    # 4. gem
-    gem_key = _cache_key("gem_global", lat, lon, target_date)
-    gem = _get_cached(gem_key)
-    if gem is None:
-        gem = await download_ensemble("gem_global", lat, lon, target_date, timezone_str)
-        if gem:
-            _set_cached(gem_key, gem)
-        await asyncio.sleep(0.3)
-
-    # 5. hrrr
+    # HRRR (separate endpoint)
     hrrr_key = _cache_key("ncep_hrrr_conus", lat, lon, target_date)
-    hrrr = _get_cached(hrrr_key)
-    if hrrr is None:
-        hrrr = await download_hrrr(lat, lon, target_date, timezone_str)
-        if hrrr:
-            _set_cached(hrrr_key, hrrr)
-        await asyncio.sleep(0.3)
+    hrrr_cached = _get_cached(hrrr_key)
+    if hrrr_cached is not None:
+        results["hrrr"] = hrrr_cached
+    else:
+        tasks.append(download_hrrr(lat, lon, target_date, timezone_str))
+        task_keys.append(("hrrr", hrrr_key))
+
+    # Fire all uncached downloads concurrently
+    if tasks:
+        fetched = await asyncio.gather(*tasks, return_exceptions=True)
+        for (short_name, key), result in zip(task_keys, fetched):
+            if isinstance(result, Exception):
+                logger.error(f"Exception downloading {short_name}: {result}")
+                results[short_name] = None
+            else:
+                results[short_name] = result
+                if result:
+                    _set_cached(key, result)
 
     return {
-        "gfs": gfs,
-        "ecmwf": ecmwf,
-        "icon": icon,
-        "gem": gem,
-        "hrrr": hrrr
+        "gfs": results.get("gfs"),
+        "ecmwf": results.get("ecmwf"),
+        "icon": results.get("icon"),
+        "gem": results.get("gem"),
+        "hrrr": results.get("hrrr"),
     }
 
 

@@ -35,6 +35,9 @@ logger = logging.getLogger("core_scanner")
 _weather_cache: Dict[str, Dict[str, Any]] = {}
 CACHE_TTL_SECONDS = 1800  # 30 minutes
 
+# Semaphore to throttle concurrent Open-Meteo requests (free tier rate limit)
+_api_semaphore = asyncio.Semaphore(2)
+
 
 def _cache_key(model: str, lat: float, lon: float, target_date: str) -> str:
     return f"{model}|{lat}|{lon}|{target_date}"
@@ -181,62 +184,63 @@ async def download_ensemble(
     backoff = 1.5
     for attempt in range(max_retries):
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=8, headers=headers) as resp:
-                    if resp.status == 429:
-                        logger.warning(
-                            f"Rate limited (429) for {model_name}. Retrying in {backoff}s..."
-                        )
-                        await asyncio.sleep(backoff)
-                        backoff *= 2
-                        continue
-                    elif resp.status != 200:
-                        text = await resp.text()
-                        logger.error(
-                            f"Open-Meteo {model_name} API error ({resp.status}): {text}"
-                        )
-                        return None
+            async with _api_semaphore:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=10, headers=headers) as resp:
+                        if resp.status == 429:
+                            logger.warning(
+                                f"Rate limited (429) for {model_name}. Retrying in {backoff}s..."
+                            )
+                            await asyncio.sleep(backoff)
+                            backoff *= 2
+                            continue
+                        elif resp.status != 200:
+                            text = await resp.text()
+                            logger.error(
+                                f"Open-Meteo {model_name} API error ({resp.status}): {text}"
+                            )
+                            return None
 
-                    data = await resp.json()
-                    hourly = data.get("hourly", {})
-                    times = hourly.get("time", [])
+                        data = await resp.json()
+                        hourly = data.get("hourly", {})
+                        times = hourly.get("time", [])
 
-                    # Find indices matching the target date (local time)
-                    indices = [
-                        i
-                        for i, t in enumerate(times)
-                        if t.startswith(target_date)
-                    ]
-                    if not indices:
-                        logger.error(
-                            f"No forecast times found matching target date {target_date}"
-                        )
-                        return None
-
-                    # Extract ensemble member keys
-                    member_keys = [
-                        k for k in hourly.keys() if k.startswith("temperature_2m")
-                    ]
-
-                    member_forecasts = {}
-                    for key in member_keys:
-                        clean_key = key.replace("temperature_2m_", "").replace(
-                            "temperature_2m", "control"
-                        )
-                        temps = [
-                            hourly[key][idx]
-                            for idx in indices
-                            if hourly[key][idx] is not None
+                        # Find indices matching the target date (local time)
+                        indices = [
+                            i
+                            for i, t in enumerate(times)
+                            if t.startswith(target_date)
                         ]
-                        if temps:
-                            member_forecasts[clean_key] = temps
+                        if not indices:
+                            logger.error(
+                                f"No forecast times found matching target date {target_date}"
+                            )
+                            return None
 
-                    return {
-                        "source": model_name,
-                        "target_date": target_date,
-                        "timezone": timezone,
-                        "members": member_forecasts,
-                    }
+                        # Extract ensemble member keys
+                        member_keys = [
+                            k for k in hourly.keys() if k.startswith("temperature_2m")
+                        ]
+
+                        member_forecasts = {}
+                        for key in member_keys:
+                            clean_key = key.replace("temperature_2m_", "").replace(
+                                "temperature_2m", "control"
+                            )
+                            temps = [
+                                hourly[key][idx]
+                                for idx in indices
+                                if hourly[key][idx] is not None
+                            ]
+                            if temps:
+                                member_forecasts[clean_key] = temps
+
+                        return {
+                            "source": model_name,
+                            "target_date": target_date,
+                            "timezone": timezone,
+                            "members": member_forecasts,
+                        }
         except Exception as e:
             if attempt == max_retries - 1:
                 logger.error(f"Error downloading {model_name} ensemble: {e}")
@@ -265,35 +269,36 @@ async def download_hrrr(
     headers = {"User-Agent": "Mozilla/5.0 (kalshi-ev-scanner-v2)"}
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, timeout=8) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    hourly = data.get("hourly", {})
-                    times = hourly.get("time", [])
-                    temp_data = hourly.get(
-                        "temperature_2m_ncep_hrrr_conus"
-                    ) or hourly.get("temperature_2m", [])
+        async with _api_semaphore:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=10) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        hourly = data.get("hourly", {})
+                        times = hourly.get("time", [])
+                        temp_data = hourly.get(
+                            "temperature_2m_ncep_hrrr_conus"
+                        ) or hourly.get("temperature_2m", [])
 
-                    indices = [
-                        i
-                        for i, t in enumerate(times)
-                        if t.startswith(target_date)
-                    ]
-                    if not indices:
-                        return None
+                        indices = [
+                            i
+                            for i, t in enumerate(times)
+                            if t.startswith(target_date)
+                        ]
+                        if not indices:
+                            return None
 
-                    temps = [
-                        temp_data[idx]
-                        for idx in indices
-                        if temp_data[idx] is not None
-                    ]
-                    if temps:
-                        return {
-                            "source": "HRRR",
-                            "target_date": target_date,
-                            "temps": temps,
-                        }
+                        temps = [
+                            temp_data[idx]
+                            for idx in indices
+                            if temp_data[idx] is not None
+                        ]
+                        if temps:
+                            return {
+                                "source": "HRRR",
+                                "target_date": target_date,
+                                "temps": temps,
+                            }
     except Exception as e:
         logger.error(f"Error downloading HRRR: {e}")
     return None

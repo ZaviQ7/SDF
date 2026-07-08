@@ -166,30 +166,51 @@ async def fetch_nws_actual_high_low(
 # ---------------------------------------------------------------------------
 # Open-Meteo Ensemble and HRRR Forecast Downloaders
 # ---------------------------------------------------------------------------
-async def download_ensemble(
-    model_name: str, lat: float, lon: float, target_date: str, timezone: str
-) -> Optional[Dict[str, Any]]:
-    """Download ensemble member forecasts for a model from Open-Meteo."""
+# (short_name, request_model, response_suffix)
+# In combined mode, Open-Meteo renames some models in the response keys:
+#   gfs_seamless       → ncep_gefs_seamless
+#   icon_seamless      → icon_seamless_eps
+#   gem_global         → gem_global_ensemble
+#   ecmwf_ifs025_ensemble stays the same
+ENSEMBLE_MODELS = [
+    ("ecmwf", "ecmwf_ifs025_ensemble", "ecmwf_ifs025_ensemble"),
+    ("gfs",   "gfs_seamless",          "ncep_gefs_seamless"),
+    ("icon",  "icon_seamless",         "icon_seamless_eps"),
+    ("gem",   "gem_global",            "gem_global_ensemble"),
+]
+
+
+async def download_all_ensembles(
+    lat: float, lon: float, target_date: str, timezone: str
+) -> Dict[str, Optional[Dict[str, Any]]]:
+    """Download ALL ensemble models in a single API call to minimise request count.
+
+    Open-Meteo supports comma-separated models.  In combined mode the hourly
+    keys use the model name as a **suffix**, e.g.
+    ``temperature_2m_member01_ecmwf_ifs025_ensemble``.
+    """
+    model_names = [req for _, req, _ in ENSEMBLE_MODELS]
+    models_param = ",".join(model_names)
     url = (
         f"https://ensemble-api.open-meteo.com/v1/ensemble"
         f"?latitude={lat}&longitude={lon}"
         f"&hourly=temperature_2m"
-        f"&models={model_name}"
+        f"&models={models_param}"
         f"&temperature_unit=fahrenheit"
         f"&timezone={timezone}"
     )
     headers = {"User-Agent": "Mozilla/5.0 (kalshi-ev-scanner-v2)"}
 
-    max_retries = 2
-    backoff = 1.5
+    max_retries = 3
+    backoff = 2.0
     for attempt in range(max_retries):
         try:
             async with _api_semaphore:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(url, timeout=10, headers=headers) as resp:
+                    async with session.get(url, timeout=20, headers=headers) as resp:
                         if resp.status == 429:
                             logger.warning(
-                                f"Rate limited (429) for {model_name}. Retrying in {backoff}s..."
+                                f"Rate limited (429) for combined ensemble. Retrying in {backoff}s..."
                             )
                             await asyncio.sleep(backoff)
                             backoff *= 2
@@ -197,60 +218,82 @@ async def download_ensemble(
                         elif resp.status != 200:
                             text = await resp.text()
                             logger.error(
-                                f"Open-Meteo {model_name} API error ({resp.status}): {text}"
+                                f"Open-Meteo combined ensemble API error ({resp.status}): {text}"
                             )
-                            return None
+                            return {s: None for s, _, _ in ENSEMBLE_MODELS}
 
                         data = await resp.json()
                         hourly = data.get("hourly", {})
                         times = hourly.get("time", [])
 
-                        # Find indices matching the target date (local time)
                         indices = [
-                            i
-                            for i, t in enumerate(times)
-                            if t.startswith(target_date)
+                            i for i, t in enumerate(times) if t.startswith(target_date)
                         ]
                         if not indices:
                             logger.error(
-                                f"No forecast times found matching target date {target_date}"
+                                f"No forecast times matching {target_date} in combined ensemble"
                             )
-                            return None
+                            return {s: None for s, _, _ in ENSEMBLE_MODELS}
 
-                        # Extract ensemble member keys
-                        member_keys = [
-                            k for k in hourly.keys() if k.startswith("temperature_2m")
-                        ]
+                        all_keys = list(hourly.keys())
 
-                        member_forecasts = {}
-                        for key in member_keys:
-                            clean_key = key.replace("temperature_2m_", "").replace(
-                                "temperature_2m", "control"
-                            )
-                            temps = [
-                                hourly[key][idx]
-                                for idx in indices
-                                if hourly[key][idx] is not None
+                        results: Dict[str, Optional[Dict[str, Any]]] = {}
+                        for short_name, req_name, resp_suffix in ENSEMBLE_MODELS:
+                            # Keys end with the model suffix, e.g.
+                            # temperature_2m_ecmwf_ifs025_ensemble  (control)
+                            # temperature_2m_member01_ecmwf_ifs025_ensemble
+                            member_keys = [
+                                k for k in all_keys
+                                if k.endswith(f"_{resp_suffix}")
+                                and k.startswith("temperature_2m")
                             ]
-                            if temps:
-                                member_forecasts[clean_key] = temps
+                            if not member_keys:
+                                results[short_name] = None
+                                continue
 
-                        return {
-                            "source": model_name,
-                            "target_date": target_date,
-                            "timezone": timezone,
-                            "members": member_forecasts,
-                        }
+                            member_forecasts = {}
+                            for key in member_keys:
+                                # Strip the model suffix to get the member part
+                                # e.g. "temperature_2m_member01_ecmwf_ifs025_ensemble"
+                                #   → base = "temperature_2m_member01"
+                                base = key[:-(len(resp_suffix) + 1)]  # strip "_suffix"
+                                if base == "temperature_2m":
+                                    clean = "control"
+                                elif base.startswith("temperature_2m_member"):
+                                    clean = base.replace("temperature_2m_", "")  # "member01"
+                                else:
+                                    continue
+                                temps = [
+                                    hourly[key][idx]
+                                    for idx in indices
+                                    if hourly[key][idx] is not None
+                                ]
+                                if temps:
+                                    member_forecasts[clean] = temps
+
+                            if member_forecasts:
+                                results[short_name] = {
+                                    "source": req_name,
+                                    "target_date": target_date,
+                                    "timezone": timezone,
+                                    "members": member_forecasts,
+                                }
+                            else:
+                                results[short_name] = None
+
+                        ok = sum(1 for v in results.values() if v is not None)
+                        logger.info(f"Combined ensemble download: {ok}/{len(ENSEMBLE_MODELS)} models OK")
+                        return results
         except Exception as e:
             if attempt == max_retries - 1:
-                logger.error(f"Error downloading {model_name} ensemble: {e}")
-                return None
+                logger.error(f"Error downloading combined ensemble: {e}")
+                return {s: None for s, _, _ in ENSEMBLE_MODELS}
             logger.warning(
-                f"Error downloading {model_name} ensemble (attempt {attempt+1}/{max_retries}): {e}. Retrying..."
+                f"Error downloading combined ensemble (attempt {attempt+1}/{max_retries}): {e}. Retrying..."
             )
             await asyncio.sleep(backoff)
             backoff *= 2
-    return None
+    return {s: None for s, _ in ENSEMBLE_MODELS}
 
 
 async def download_hrrr(
@@ -311,48 +354,33 @@ async def get_forecasts_for_date(
     lat: float, lon: float, target_date: str, timezone_str: str
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """Retrieve and cache GFS, ECMWF, ICON, GEM, and HRRR forecasts for a given coordinate & date."""
-    # Define models to download
-    ensemble_models = [
-        ("ecmwf", "ecmwf_ifs025_ensemble"),
-        ("gfs", "gfs_seamless"),
-        ("icon", "icon_seamless"),
-        ("gem", "gem_global"),
-    ]
 
-    # Check cache first, build list of tasks for uncached models
-    results = {}
-    tasks = []
-    task_keys = []
+    # --- Ensemble models (single combined API call) ---
+    # Check if ALL ensemble models are cached
+    ensemble_cache_keys = {
+        s: _cache_key(m, lat, lon, target_date) for s, m, _ in ENSEMBLE_MODELS
+    }
+    all_cached = all(_get_cached(k) is not None for k in ensemble_cache_keys.values())
 
-    for short_name, model_name in ensemble_models:
-        key = _cache_key(model_name, lat, lon, target_date)
-        cached = _get_cached(key)
-        if cached is not None:
-            results[short_name] = cached
-        else:
-            tasks.append(download_ensemble(model_name, lat, lon, target_date, timezone_str))
-            task_keys.append((short_name, key))
+    if all_cached:
+        results = {s: _get_cached(k) for s, k in ensemble_cache_keys.items()}
+    else:
+        # One API call fetches all 4 ensemble models
+        results = await download_all_ensembles(lat, lon, target_date, timezone_str)
+        for short_name, cache_key in ensemble_cache_keys.items():
+            if results.get(short_name):
+                _set_cached(cache_key, results[short_name])
 
-    # HRRR (separate endpoint)
+    # --- HRRR (separate endpoint) ---
     hrrr_key = _cache_key("ncep_hrrr_conus", lat, lon, target_date)
     hrrr_cached = _get_cached(hrrr_key)
     if hrrr_cached is not None:
         results["hrrr"] = hrrr_cached
     else:
-        tasks.append(download_hrrr(lat, lon, target_date, timezone_str))
-        task_keys.append(("hrrr", hrrr_key))
-
-    # Fire all uncached downloads concurrently
-    if tasks:
-        fetched = await asyncio.gather(*tasks, return_exceptions=True)
-        for (short_name, key), result in zip(task_keys, fetched):
-            if isinstance(result, Exception):
-                logger.error(f"Exception downloading {short_name}: {result}")
-                results[short_name] = None
-            else:
-                results[short_name] = result
-                if result:
-                    _set_cached(key, result)
+        hrrr = await download_hrrr(lat, lon, target_date, timezone_str)
+        results["hrrr"] = hrrr
+        if hrrr:
+            _set_cached(hrrr_key, hrrr)
 
     return {
         "gfs": results.get("gfs"),

@@ -438,7 +438,7 @@
     "city": "PHIL",
     "temp_type": "HIGH",
     "forecast_mean": 77.43810593495935,
-    "actual": null
+    "actual": 78.0
   },
   {
     "date": "2026-07-07",
@@ -466,14 +466,14 @@
     "city": "MIA",
     "temp_type": "HIGH",
     "forecast_mean": 92.06900455284551,
-    "actual": null
+    "actual": 93.0
   },
   {
     "date": "2026-07-07",
     "city": "NY",
     "temp_type": "HIGH",
     "forecast_mean": 71.53948,
-    "actual": null
+    "actual": 70.0
   },
   {
     "date": "2026-07-07",
@@ -508,14 +508,14 @@
     "city": "ATL",
     "temp_type": "HIGH",
     "forecast_mean": 92.20797,
-    "actual": null
+    "actual": 93.0
   },
   {
     "date": "2026-07-07",
     "city": "ATL",
     "temp_type": "LOW",
     "forecast_mean": 72.30397,
-    "actual": null
+    "actual": 72.0
   },
   {
     "date": "2026-07-07",
@@ -563,126 +563,126 @@
     "date": "2026-07-08",
     "city": "PHIL",
     "temp_type": "HIGH",
-    "forecast_mean": 84.17107593495935,
+    "forecast_mean": 83.36215676984246,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "CHI",
     "temp_type": "HIGH",
-    "forecast_mean": 88.17824357723575,
+    "forecast_mean": 88.65821455927974,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "DEN",
     "temp_type": "HIGH",
-    "forecast_mean": 91.28672766260162,
+    "forecast_mean": 92.20754262179433,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "AUS",
     "temp_type": "HIGH",
-    "forecast_mean": 96.93436000000001,
+    "forecast_mean": 97.79053652307601,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "MIA",
     "temp_type": "HIGH",
-    "forecast_mean": 93.68870455284551,
+    "forecast_mean": 92.78021136751737,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "NY",
     "temp_type": "HIGH",
-    "forecast_mean": 84.33133000000001,
+    "forecast_mean": 79.14235965658915,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "HOU",
     "temp_type": "HIGH",
-    "forecast_mean": 95.58435,
+    "forecast_mean": 95.45671204848495,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "HOU",
     "temp_type": "LOW",
-    "forecast_mean": 77.66821000000002,
+    "forecast_mean": 77.44214501364631,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "PHX",
     "temp_type": "HIGH",
-    "forecast_mean": 111.36795,
+    "forecast_mean": 111.57057047100402,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "PHX",
     "temp_type": "LOW",
-    "forecast_mean": 89.60091,
+    "forecast_mean": 88.3996657210518,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "ATL",
     "temp_type": "HIGH",
-    "forecast_mean": 92.64849000000001,
+    "forecast_mean": 93.45804104368294,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "ATL",
     "temp_type": "LOW",
-    "forecast_mean": 73.75548,
+    "forecast_mean": 72.0662164043976,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "OKC",
     "temp_type": "HIGH",
-    "forecast_mean": 99.93151,
+    "forecast_mean": 100.223755353201,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "OKC",
     "temp_type": "LOW",
-    "forecast_mean": 75.363,
+    "forecast_mean": 74.84973737609957,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "SEA",
     "temp_type": "HIGH",
-    "forecast_mean": 72.00733999999999,
+    "forecast_mean": 72.24086836967166,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "SEA",
     "temp_type": "LOW",
-    "forecast_mean": 56.60872,
+    "forecast_mean": 56.59768673211385,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "SFO",
     "temp_type": "HIGH",
-    "forecast_mean": 65.65744,
+    "forecast_mean": 65.46961882298658,
     "actual": null
   },
   {
     "date": "2026-07-08",
     "city": "SFO",
     "temp_type": "LOW",
-    "forecast_mean": 54.848879999999994,
+    "forecast_mean": 54.57166038032855,
     "actual": null
   }
 ]

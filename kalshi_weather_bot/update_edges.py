@@ -844,7 +844,7 @@ async def run_update():
         port_data["bankroll"] = total_nav
         port_data["net_pnl"] = net_pnl
         # Updated datetime method
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(pytz.utc)
         port_data["last_updated"] = now_utc.isoformat()
         with open(portfolio_file, "w") as f:
             json.dump(port_data, f, indent=4)

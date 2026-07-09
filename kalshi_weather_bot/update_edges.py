@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import json
 import sys
 import yaml
 import pytz
@@ -30,14 +31,10 @@ logger.setLevel(logging.INFO)
 # Map city names to NWS airport stations and timezones (populated dynamically from cities.yaml)
 CITY_STATIONS = {}
 
-# fetch_nws_actual_high_low is imported from core_scanner
-
 def evaluate_contract(ticker: str, play_desc: str, actual_temp: float) -> bool | None:
     """Evaluate if a weather range contract settled YES (True) or NO (False)."""
-    # 1. Parse target condition from play_desc to resolve threshold direction ambiguity (e.g. <91 vs >=91)
     rtype, val1, val2 = parse_range(play_desc)
     if not rtype:
-        # Fallback to ticker parsing if description is missing/malformed
         parts = ticker.split("-")
         if len(parts) < 3:
             return None
@@ -58,7 +55,6 @@ def evaluate_contract(ticker: str, play_desc: str, actual_temp: float) -> bool |
         return None
         
     actual_rounded = int(round(actual_temp))
-    
     if rtype == "between":
         return (actual_rounded >= val1) and (actual_rounded <= val2)
     elif rtype == "greater":
@@ -77,7 +73,6 @@ def parse_logged_trades(file_path: str) -> list:
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
     except Exception:
-        # Fallback to CP1252 if UTF-8 fails (for Windows)
         with open(file_path, "r", encoding="cp1252") as f:
             content = f.read()
             
@@ -95,7 +90,6 @@ def parse_logged_trades(file_path: str) -> list:
                 
             location_line = parts[1]
             if ticker:
-                # Normalize separator to bullet point
                 location_line = location_line.replace(" | [Kalshi Link]", " • [Kalshi Link]")
                 if "Kalshi Link" not in location_line:
                     ticker_parts = ticker.split("-")
@@ -137,7 +131,7 @@ async def send_discord_report(active_trades: list):
             "embeds": [{
                 "title": "☀️ Live +EV Weather Trades Report",
                 "description": "No active weather trades currently meet the >53% probability and positive EV criteria.",
-                "color": 16711680 # Red
+                "color": 16711680
             }]
         }
     else:
@@ -164,12 +158,11 @@ async def send_discord_report(active_trades: list):
             "embeds": [{
                 "title": "☀️ Live +EV Weather Trades Report",
                 "description": description,
-                "color": 3066993, # Green
+                "color": 3066993,
                 "timestamp": datetime.now(pytz.utc).isoformat()
             }]
         }
         
-    # Check if a mention (like @here, @everyone, or a user ID) is requested
     mention = os.getenv("DISCORD_MENTION")
     if mention:
         if mention.isdigit():
@@ -203,17 +196,15 @@ async def run_update():
         cities_data = yaml.safe_load(f)
         cities = cities_data.get("cities", [])
         
-    # Dynamically populate city stations mapping from config
     for c in cities:
         CITY_STATIONS[c["name"]] = {
             "station": c["nws_station_id"],
             "timezone": c["timezone"]
         }
         
-    # Configure production simulation
     config['kalshi']['environment'] = 'prod'
     config['kalshi']['simulation'] = True
-    config['kalshi']['trading']['min_edge_threshold'] = 0.00  # Fetch any positive edge
+    config['kalshi']['trading']['min_edge_threshold'] = 0.00
     
     client = KalshiWeatherClient(config)
     model_processor = WeatherModelProcessor(config)
@@ -221,10 +212,22 @@ async def run_update():
     risk_manager = RiskManager(config)
     bias_tracker = BiasTracker(config)
     
+    portfolio_file = os.path.join("data", "historical", "simulated_portfolio.json")
+    simulated_cash = float(config['risk'].get('bankroll', 15.00))
+    if os.path.exists(portfolio_file):
+        try:
+            with open(portfolio_file, "r") as f:
+                port_data = json.load(f)
+            simulated_cash = float(port_data.get("cash_balance", port_data.get("bankroll", 15.00)))
+            logger.info(f"Loaded persistent simulated cash: ${simulated_cash:.2f}")
+        except Exception as e:
+            logger.warning(f"Error loading simulated portfolio file: {e}")
+    else:
+        logger.info(f"Persistent simulated portfolio file not found. Using config bankroll: ${simulated_cash:.2f}")
+    
     import sys
     settle_only = "--settle-only" in sys.argv
     
-    # Automatically update actuals and compute rolling MOS bias offsets daily
     if settle_only:
         logger.info("Skipping rolling MOS bias offset recalculation in SETTLE-ONLY mode.")
         bias_offsets = {}
@@ -238,16 +241,96 @@ async def run_update():
     
     await client.initialize()
     
-    # Load previously logged trades from the MD file
     edges_file_path = os.path.join("..", "theoretical_edges.md")
     if not os.path.exists(edges_file_path):
         edges_file_path = "theoretical_edges.md"
         
     logged_trades = parse_logged_trades(edges_file_path)
     logger.info(f"Loaded {len(logged_trades)} existing trades from log.")
+
+    # =======================================================================
+    # STEP 1: AUTO-SETTLE OPEN TRADES FIRST (Liquidate positions to unlock capital)
+    # =======================================================================
+    logger.info("Checking for open weather trades to auto-settle...")
+    for t in logged_trades:
+        if "Open" in t["status"]:
+            try:
+                dt_obj = datetime.strptime(t["formatted_date"], "%b %d, %Y")
+                trade_date_str = dt_obj.strftime("%Y-%m-%d")
+            except Exception:
+                continue
+                
+            city_name = "Miami"
+            for c in CITY_STATIONS.keys():
+                if c in t["location_line"]:
+                    city_name = c
+                    break
+                    
+            station_info = CITY_STATIONS[city_name]
+            timezone_str = station_info["timezone"]
+            station_id = station_info["station"]
+            temp_type = "HIGH" if "High" in t["location_line"] else "LOW"
+            
+            tz = pytz.timezone(timezone_str)
+            local_dt = datetime.now(tz)
+            local_today = local_dt.strftime("%Y-%m-%d")
+            
+            is_past = trade_date_str < local_today
+            is_same_day_late = (trade_date_str == local_today and local_dt.hour >= 21)
+            
+            if not (is_past or is_same_day_late):
+                logger.info(f"Skipping auto-settlement for {t['ticker']}: Target date {trade_date_str} is today and it's before 9 PM local time.")
+                continue
+                
+            actual_temp = await fetch_nws_actual_high_low(station_id, trade_date_str, timezone_str, temp_type)
+            if actual_temp is not None:
+                result = evaluate_contract(t["ticker"], t["play_desc"], actual_temp)
+                if result is not None:
+                    cost_match = re.search(r"\(\$([\d\.]+)\s+total\)", t["total_cost_line"])
+                    cost = float(cost_match.group(1)) if cost_match else 0.0
+                    
+                    payout_match = re.search(r"\!??\$([\d\.]+)", t["est_payout"])
+                    est_payout = float(payout_match.group(1)) if payout_match else 0.0
+                    
+                    side = "YES" if "Buy YES" in t["play_desc"] else "NO"
+                    contract_won = (result and side == "YES") or (not result and side == "NO")
+                    
+                    if contract_won:
+                        net_profit = est_payout - cost
+                        t["status"] = f"✅ **Won (+${net_profit:.2f})**"
+                        simulated_cash += est_payout
+                    else:
+                        t["status"] = f"❌ **Lost (-${cost:.2f})**"
+                        
+                    ticker = t["ticker"]
+                    parts = ticker.split("-")
+                    if len(parts) >= 2:
+                        market_series_prefix = parts[0].lower()
+                        event_ticker_prefix = "-".join(parts[:2]).lower()
+                        kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
+                        if "Kalshi Link" not in t["location_line"]:
+                            t["location_line"] = re.sub(
+                                r"(\[NOAA Link\]\([^\)]+\))",
+                                r"\1 | [Kalshi Link](" + kalshi_url + ")",
+                                t["location_line"]
+                            )
+                            
+                    logger.info(f"Auto-settled trade {t['ticker']} on {trade_date_str}: {t['status']}")
+
+    # =======================================================================
+    # STEP 2: RUN BANKROLL ALLOCATION & SIZE TOMORROW'S OPPORTUNITIES
+    # =======================================================================
+    initial_open_exposure = 0.0
+    for t in logged_trades:
+        if "Open" in t["status"]:
+            cost_match = re.search(r"\(\$([\d\.]+)\s+total\)", t["total_cost_line"])
+            initial_open_exposure += float(cost_match.group(1)) if cost_match else 0.0
+            
+    risk_manager.bankroll = simulated_cash + initial_open_exposure
+    logger.info(f"Total Portfolio Value (NAV) for sizing: ${risk_manager.bankroll:.2f} (Cash: ${simulated_cash:.2f}, Open Exposure: ${initial_open_exposure:.2f})")
     
-    # Scan tomorrow's new edges
     new_edges = []
+    candidate_edges = []
     live_market_stats = {}
     detected_edges_registry = {}
     cached_pooled_temps = {}
@@ -283,7 +366,6 @@ async def run_update():
             except Exception:
                 continue
                 
-            # Download forecasts once per city using cache/mixture collection
             forecasts = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
             gfs_forecast = forecasts["gfs"]
             ecmwf_forecast = forecasts["ecmwf"]
@@ -291,17 +373,6 @@ async def run_update():
             icon_forecast = forecasts["icon"]
             gem_forecast = forecasts["gem"]
             
-            try:
-                dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
-                date_ticker_str = dt_obj.strftime("%y%b%d").upper()
-                date_formatted_str = dt_obj.strftime("%b %d, %Y")
-                
-                # Compute lead hours to target date
-                target_dt = tz.localize(datetime.combine(dt_obj.date(), datetime.max.time()))
-                hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
-            except Exception:
-                continue
-                
             if not any([gfs_forecast, ecmwf_forecast, icon_forecast, gem_forecast]):
                 logger.warning(f"  Skipping city {city_name} on {target_date} because no forecasts were retrieved.")
                 continue
@@ -312,7 +383,15 @@ async def run_update():
             ]
             
             for temp_type, prefix in scans:
-                # Skip already-determined same-day contracts
+                from datetime import time as dt_time
+                target_time = dt_time(7, 0) if temp_type == "LOW" else dt_time(16, 0)
+                
+                try:
+                    target_dt = tz.localize(datetime.combine(dt_obj.date(), target_time))
+                    hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
+                except Exception:
+                    hours_to_target = 24.0
+                    
                 today_str = local_now.strftime("%Y-%m-%d")
                 if target_date == today_str:
                     local_hour = local_now.hour
@@ -322,7 +401,7 @@ async def run_update():
                         continue
                         
                 markets = await client.get_weather_markets(prefix)
-                await asyncio.sleep(1.0)  # Pacing rate limit protection
+                await asyncio.sleep(1.0)
                 if not markets:
                     continue
                     
@@ -347,9 +426,6 @@ async def run_update():
                 )
                 if len(pooled_temps) == 0:
                     continue
-                    
-                # Real-time NWS clipping is disabled to avoid sensor outlier/mismatch contamination.
-                # Relying entirely on models (such as hourly HRRR updates) for active predictions.
                         
                 cached_pooled_temps[(city["code"], target_date, temp_type)] = pooled_temps
                 stats = model_processor.get_distribution_stats(pooled_temps)
@@ -360,7 +436,6 @@ async def run_update():
                 model_probabilities = {}
                 for m in date_markets:
                     ticker = m["ticker"]
-                    # Skip cross-contamination from substring matching in Kalshi API
                     ticker_type = "HIGH" if "HIGH" in ticker else "LOW"
                     if ticker_type != temp_type:
                         continue
@@ -373,7 +448,6 @@ async def run_update():
                     prob = calculate_market_probability(rtype, val1, val2, pooled_temps)
                     model_probabilities[ticker] = prob
                     
-                    # Store live stats for updating existing logged trades
                     live_market_stats[ticker] = {
                         "model_prob": prob,
                         "yes_ask": m["yes_ask"],
@@ -391,14 +465,43 @@ async def run_update():
                         edge["temp_type"] = temp_type
                         edge["formatted_date"] = date_formatted_str
                         edge["target_date"] = target_date
-                        size = risk_manager.calculate_position_size(edge, risk_manager.bankroll, 0.0)
-                        edge["suggested_size"] = size if size > 0 else 1
-                        new_edges.append(edge)
+                        candidate_edges.append(edge)
+                        
+    candidate_groups = {}
+    for edge in candidate_edges:
+        parts = edge["ticker"].split("-")
+        if len(parts) >= 2:
+            prefix = parts[0]
+            date_code = parts[1]
+            event_key = (prefix, date_code)
+        else:
+            event_key = (edge["ticker"], "")
+            
+        if event_key not in candidate_groups:
+            candidate_groups[event_key] = {"yes": [], "no": []}
+        candidate_groups[event_key][edge["side"]].append(edge)
+        
+    final_candidate_edges = []
+    for event_key, side_dict in candidate_groups.items():
+        yes_list = side_dict["yes"]
+        no_list = side_dict["no"]
+        
+        for edge in yes_list:
+            edge["group_yes_count"] = len(yes_list)
+            edge["overlapping_yes"] = len(yes_list) > 1
+            final_candidate_edges.append(edge)
+            
+        for edge in no_list:
+            edge["group_no_count"] = len(no_list)
+            final_candidate_edges.append(edge)
+            
+    for edge in final_candidate_edges:
+        size = risk_manager.calculate_position_size(edge, risk_manager.bankroll, 0.0)
+        edge["suggested_size"] = size if size > 0 else 1
+        new_edges.append(edge)
                     
-    # Close client session as it is no longer needed
     await client.close()
     
-    # 2.1 Update existing open weather trades with current live stats
     logger.info("Updating existing open weather trades with live stats...")
     updated_logged_trades = []
     for t in logged_trades:
@@ -428,32 +531,11 @@ async def run_update():
                 cost_unit = current_price + fee_unit
                 current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                     
-                # Always keep existing open trades so they can be tracked, but update their live metrics
-                size = t["qty"]
-                cost = current_price * size
-                fee = calculate_maker_fee(current_price, size)
-                total = cost + fee
-                payout = size * 1.00
-                
-                try:
-                    play_desc = f"**Buy {side}** {stats['title'].split(' be ')[1].split(' on ')[0]} @ {int(current_price*100)}¢"
-                    edge_info = detected_edges_registry.get(ticker, {})
-                    if edge_info.get("overlapping_yes"):
-                        play_desc += "<br>⚠️ *Overlapping YES Play*"
-                    elif edge_info.get("group_no_count", 1) > 1:
-                        no_count = edge_info["group_no_count"]
-                        play_desc += f"<br>⚠️ *Correlated NO (Scaled 1/{no_count})*"
-                    t["play_desc"] = play_desc
-                except Exception:
-                    pass
-                t["total_cost_line"] = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
                 t["true_prob"] = f"{prob_play:.1%}"
                 t["net_ev"] = f"{current_ev:>+6.1%}"
-                t["est_payout"] = f"${payout:.2f}"
                 updated_logged_trades.append(t)
                 logger.info(f"Updated live open trade {ticker}: Prob {prob_play:.1%}, EV {current_ev:+.1%}")
             else:
-                # If ticker is closed on Kalshi, evaluate using cached pooled forecast
                 parts = ticker.split("-")
                 if len(parts) >= 3:
                     prefix = parts[0]
@@ -488,16 +570,12 @@ async def run_update():
                                 prob_play = prob if side == "YES" else (1.0 - prob)
                                 
                                 price_match = re.search(r"@\s*(\d+)¢", play_desc)
-                                if price_match:
-                                    current_price = float(price_match.group(1)) / 100.0
-                                else:
-                                    current_price = 0.01
+                                current_price = float(price_match.group(1)) / 100.0 if price_match else 0.01
                                     
                                 fee_unit = calculate_maker_fee(current_price, 1)
                                 cost_unit = current_price + fee_unit
                                 current_ev = (prob_play / cost_unit) - 1.0 if cost_unit > 0 else 0.0
                                 
-                                # Always keep existing closed open trades, but update their live metrics
                                 t["true_prob"] = f"{prob_play:.1%}"
                                 t["net_ev"] = f"{current_ev:>+6.1%}"
                                 updated_logged_trades.append(t)
@@ -509,12 +587,10 @@ async def run_update():
             
     logged_trades = updated_logged_trades
             
-    # 2.2 Add tomorrow's new edges to logged_trades (if not already logged)
+    new_edges.sort(key=lambda x: x.get("net_ev", 0.0), reverse=True)
     for ne in new_edges:
         ticker = ne["ticker"]
-        # Check if already logged
         if not any(t["ticker"] == ticker for t in logged_trades):
-            # Resolve NWS weather.gov station observation link for this city
             city = ne["city"]
             ttype = ne["temp_type"]
             station_info = CITY_STATIONS.get(city, {"station": "KMIA"})
@@ -529,14 +605,16 @@ async def run_update():
             total = cost + fee
             payout = size * 1.00
             
+            if simulated_cash < total:
+                logger.info(f"Skipping paper-trade for {ticker}: Insufficient bankroll (requires ${total:.2f}, balance: ${simulated_cash:.2f})")
+                continue
+                
             parts = ticker.split("-")
             market_series_prefix = parts[0].lower()
             event_ticker_prefix = "-".join(parts[:2]).lower()
             kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
             
             play_desc = f"**Buy {side}** {ne['title'].split(' be ')[1].split(' on ')[0]} @ {int(price*100)}¢"
-            
-            # Add correlation / mutual exclusivity warnings to action description
             if ne.get("overlapping_yes"):
                 play_desc += "<br>⚠️ *Overlapping YES Play*"
             elif ne.get("group_no_count", 1) > 1:
@@ -545,6 +623,8 @@ async def run_update():
                 
             location_line = f"**{city} {ttype.capitalize()}** ([NOAA Link]({nws_link}) • [Kalshi Link]({kalshi_url}))<br>`{ticker}`"
             total_cost_line = f"${cost:.2f} + ${fee:.2f} fee<br>**(${total:.2f} total)**"
+            
+            simulated_cash -= total
             
             logged_trades.append({
                 "formatted_date": ne["formatted_date"],
@@ -559,95 +639,14 @@ async def run_update():
                 "ticker": ticker
             })
 
-    # 3. Auto-Settle Open Trades that have passed
-    logger.info("Checking for open weather trades to auto-settle...")
-    for t in logged_trades:
-        # We check if the trade is currently open
-        if "Open" in t["status"]:
-            # Parse target date from formatted_date (e.g. "Jul 03, 2026" -> "2026-07-03")
-            try:
-                dt_obj = datetime.strptime(t["formatted_date"], "%b %d, %Y")
-                trade_date_str = dt_obj.strftime("%Y-%m-%d")
-            except Exception:
-                continue
-                
-            # If target date < today, let's fetch outcomes
-            # Find city name from location line
-            city_name = "Miami"
-            for c in CITY_STATIONS.keys():
-                if c in t["location_line"]:
-                    city_name = c
-                    break
-                    
-            station_info = CITY_STATIONS[city_name]
-            timezone_str = station_info["timezone"]
-            station_id = station_info["station"]
-            temp_type = "HIGH" if "High" in t["location_line"] else "LOW"
-            
-            # Skip settlement if target date is not in the past relative to local timezone
-            tz = pytz.timezone(timezone_str)
-            local_dt = datetime.now(tz)
-            local_today = local_dt.strftime("%Y-%m-%d")
-            
-            # Allow settlement on the same day if it's after 9 PM (21:00) local time (high/low are already fully determined)
-            is_past = trade_date_str < local_today
-            is_same_day_late = (trade_date_str == local_today and local_dt.hour >= 21)
-            
-            if not (is_past or is_same_day_late):
-                logger.info(f"Skipping auto-settlement for {t['ticker']}: Target date {trade_date_str} is today and it's before 9 PM local time (current: {local_dt.hour}:00).")
-                continue
-                
-            # Fetch actual temp
-            actual_temp = await fetch_nws_actual_high_low(station_id, trade_date_str, timezone_str, temp_type)
-            if actual_temp is not None:
-                # Settle contract
-                result = evaluate_contract(t["ticker"], t["play_desc"], actual_temp)
-                if result is not None:
-                    # Calculate cost and payouts
-                    cost_match = re.search(r"\(\$([\d\.]+)\s+total\)", t["total_cost_line"])
-                    cost = float(cost_match.group(1)) if cost_match else 0.0
-                    
-                    payout_match = re.search(r"\$([\d\.]+)", t["est_payout"])
-                    est_payout = float(payout_match.group(1)) if payout_match else 0.0
-                    
-                    # Settle
-                    side = "YES" if "Buy YES" in t["play_desc"] else "NO"
-                    # If result is True, YES wins. If result is False, NO wins.
-                    contract_won = (result and side == "YES") or (not result and side == "NO")
-                    
-                    if contract_won:
-                        net_profit = est_payout - cost
-                        t["status"] = f"✅ **Won (+${net_profit:.2f})**"
-                    else:
-                        t["status"] = f"❌ **Lost (-${cost:.2f})**"
-                        
-                    # Add exact Kalshi market link when settling if not already present
-                    ticker = t["ticker"]
-                    parts = ticker.split("-")
-                    if len(parts) >= 2:
-                        market_series_prefix = parts[0].lower()
-                        event_ticker_prefix = "-".join(parts[:2]).lower()
-                        kalshi_url = f"https://kalshi.com/markets/{market_series_prefix}/a/{event_ticker_prefix}"
-                        if "Kalshi Link" not in t["location_line"]:
-                            t["location_line"] = re.sub(
-                                r"(\[NOAA Link\]\([^\)]+\))",
-                                r"\1 | [Kalshi Link](" + kalshi_url + ")",
-                                t["location_line"]
-                            )
-                            
-                    logger.info(f"Auto-settled trade {t['ticker']} on {trade_date_str}: {t['status']}")
-
-    # 4. Separate active (Open) and historical (Won/Lost)
     active_trades = []
     historical_trades = []
-    
     for t in logged_trades:
         if "Open" in t["status"]:
             active_trades.append(t)
         else:
             historical_trades.append(t)
             
-    # Sort historical trades by date descending (latest at top of history)
     historical_trades.sort(key=lambda x: datetime.strptime(x["formatted_date"], "%b %d, %Y") if "%" not in x["formatted_date"] else datetime.now(), reverse=True)
 
     # 5. Calculate Running Performance Stats & Daily Breakdown
@@ -662,12 +661,7 @@ async def run_update():
     for t in historical_trades:
         date = t["formatted_date"]
         if date not in daily_stats:
-            daily_stats[date] = {
-                "wins": 0,
-                "losses": 0,
-                "cost": 0.0,
-                "payout": 0.0
-            }
+            daily_stats[date] = {"wins": 0, "losses": 0, "cost": 0.0, "payout": 0.0}
             
         cost_match = re.search(r"\(\$([\d\.]+)\s+total\)", t["total_cost_line"])
         cost = float(cost_match.group(1)) if cost_match else 0.0
@@ -676,28 +670,68 @@ async def run_update():
         
         if "Won" in t["status"]:
             daily_stats[date]["wins"] += 1
-            payout_match = re.search(r"\$([\d\.]+)", t["est_payout"])
+            payout_match = re.search(r"\!??\$([\d\.]+)", t["est_payout"])
             payout = float(payout_match.group(1)) if payout_match else 0.0
             total_payout += payout
             daily_stats[date]["payout"] += payout
         else:
             daily_stats[date]["losses"] += 1
             
-    net_profit = total_payout - total_cost
-    roi = (net_profit / total_cost * 100) if total_cost > 0 else 0.0
+    total_open_exposure = 0.0
+    for t in active_trades:
+        cost_match = re.search(r"\(\$([\d\.]+)\s+total\)", t["total_cost_line"])
+        total_open_exposure += float(cost_match.group(1)) if cost_match else 0.0
+        
+    initial_bankroll = 15.00
+    total_nav = simulated_cash + total_open_exposure
+    net_pnl = total_nav - initial_bankroll
+    win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
     
+    chronological_dates = sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%b %d, %Y") if "%" not in x else datetime.now())
+    running_bankroll = initial_bankroll
+    daily_returns = []
+    
+    for d in chronological_dates:
+        stats = daily_stats[d]
+        d_net = stats["payout"] - stats["cost"]
+        r_t = d_net / running_bankroll if running_bankroll > 0 else 0.0
+        daily_returns.append(r_t)
+        running_bankroll += d_net
+        
+    sharpe_ratio_str = "N/A"
+    sortino_ratio_str = "N/A"
+    
+    if len(daily_returns) >= 2:
+        mean_return = np.mean(daily_returns)
+        std_return = np.std(daily_returns)
+        downside_returns = [r for r in daily_returns if r < 0]
+        std_downside = np.std(downside_returns) if len(downside_returns) >= 2 else np.std(daily_returns)
+        
+        if std_return > 0:
+            sharpe = (mean_return / std_return) * np.sqrt(365)
+            sharpe_ratio_str = f"{sharpe:.2f}"
+        if std_downside > 0:
+            sortino = (mean_return / std_downside) * np.sqrt(365)
+            sortino_ratio_str = f"{sortino:.2f}"
+            
     # 6. Rebuild Markdown Content
     markdown_lines = [
-        "# Theoretical Edges & Trade Tracking Log",
+        "# Weather Arbitrage Tracker Dashboard",
         "",
-        "Use this file to log and track your +EV trades, expected probabilities, and actual outcomes to verify your edge.",
+        "This dashboard tracks the simulated portfolio performance of the automated weather model edge detector.",
+        "",
+        f"*   **Total Portfolio NAV (Equity):** ${total_nav:.2f} USD",
+        f"*   **Cash Reserves:** ${simulated_cash:.2f} USD",
+        f"*   **Open Exposure (Capital Risked):** ${total_open_exposure:.2f} USD",
+        f"*   **Net Profit/Loss:** {'+' if net_pnl >= 0 else ''}${net_pnl:.2f} USD",
+        f"*   **Win Rate:** {win_rate:.1f}% ({wins} Won / {losses} Lost)",
+        f"*   **Sharpe Ratio (Annualized):** {sharpe_ratio_str}",
+        f"*   **Sortino Ratio (Annualized):** {sortino_ratio_str}",
         "",
         "## 📊 Running Performance Summary",
         f"*   **Total Trades Logged:** {total_trades}",
-        f"*   **Win/Loss Record:** {wins} wins / {losses} losses",
         f"*   **Total Capital Risked:** ${total_cost:.2f}",
         f"*   **Total Payout:** ${total_payout:.2f}",
-        f"*   **Net Profit:** {'+' if net_profit >= 0 else ''}${net_profit:.2f} (ROI: {roi:.1f}%)",
         "",
         "### 📅 Daily Performance History",
         "",
@@ -705,7 +739,6 @@ async def run_update():
         "| :--- | :---: | :---: | :---: | :---: | :---: |"
     ]
     
-    # Sort daily dates chronologically descending
     sorted_dates = sorted(daily_stats.keys(), key=lambda x: datetime.strptime(x, "%b %d, %Y") if "%" not in x else datetime.now(), reverse=True)
     for d in sorted_dates:
         stats = daily_stats[d]
@@ -715,7 +748,6 @@ async def run_update():
             f"| {d} | {stats['wins']} W / {stats['losses']} L | ${stats['cost']:.2f} | ${stats['payout']:.2f} | {'+' if d_net >= 0 else ''}${d_net:.2f} | {d_roi:.1f}% |"
         )
         
-    # Group active trades by target date
     active_by_date = {}
     for t in active_trades:
         date = t["formatted_date"]
@@ -723,21 +755,11 @@ async def run_update():
             active_by_date[date] = []
         active_by_date[date].append(t)
         
-    # Sort dates chronologically descending (latest date/tomorrow first)
-    sorted_active_dates = sorted(
-        active_by_date.keys(),
-        key=lambda x: datetime.strptime(x, "%b %d, %Y") if "%" not in x else datetime.now(),
-        reverse=True
-    )
+    sorted_active_dates = sorted(active_by_date.keys(), key=lambda x: datetime.strptime(x, "%b %d, %Y") if "%" not in x else datetime.now(), reverse=True)
     
-    # We output a section for each date
     for date in sorted_active_dates:
         trades_for_date = active_by_date[date]
-        # Sort trades for this date by Net EV descending
-        trades_for_date.sort(
-            key=lambda x: float(x["net_ev"].replace("%", "").replace("+", "").strip()) if "%" in x["net_ev"] else 0.0,
-            reverse=True
-        )
+        trades_for_date.sort(key=lambda x: float(x["net_ev"].replace("%", "").replace("+", "").strip()) if "%" in x["net_ev"] else 0.0, reverse=True)
         
         markdown_lines.extend([
             "",
@@ -749,11 +771,8 @@ async def run_update():
             "| Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |",
             "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |"
         ])
-        
         for t in trades_for_date:
-            markdown_lines.append(
-                f"| {t['formatted_date']} | {t['location_line']} | {t['play_desc']} | {t['qty']} | {t['total_cost_line']} | {t['true_prob']} | {t['net_ev']} | {t['est_payout']} | {t['status']} |"
-            )
+            markdown_lines.append(f"| {t['formatted_date']} | {t['location_line']} | {t['play_desc']} | {t['qty']} | {t['total_cost_line']} | {t['true_prob']} | {t['net_ev']} | {t['est_payout']} | {t['status']} |")
             
     if not active_trades:
         tomorrow_dt = datetime.now(pytz.timezone("America/New_York")) + timedelta(days=1)
@@ -780,30 +799,39 @@ async def run_update():
         "| Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |",
         "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |"
     ])
-    
     for t in historical_trades:
-        markdown_lines.append(
-            f"| {t['formatted_date']} | {t['location_line']} | {t['play_desc']} | {t['qty']} | {t['total_cost_line']} | {t['true_prob']} | {t['net_ev']} | {t['est_payout']} | {t['status']} |"
-        )
+        markdown_lines.append(f"| {t['formatted_date']} | {t['location_line']} | {t['play_desc']} | {t['qty']} | {t['total_cost_line']} | {t['true_prob']} | {t['net_ev']} | {t['est_payout']} | {t['status']} |")
         
     if not historical_trades:
         markdown_lines.append("| - | *No historical trades settled yet* | - | - | - | - | - | - | - |")
         
     markdown_lines.append("")
     
-    # Write the file back in UTF-8
     with open(edges_file_path, "w", encoding="utf-8") as f:
         f.write("\n".join(markdown_lines))
         
     logger.info("theoretical_edges.md rewritten and updated successfully!")
     
-    # Send Discord notification report
+    try:
+        if os.path.exists(portfolio_file):
+            with open(portfolio_file, "r") as f:
+                port_data = json.load(f)
+        else:
+            port_data = {}
+        port_data["cash_balance"] = simulated_cash
+        port_data["bankroll"] = total_nav
+        port_data["net_pnl"] = net_pnl
+        port_data["last_updated"] = datetime.utcnow().isoformat() + "Z"
+        with open(portfolio_file, "w") as f:
+            json.dump(port_data, f, indent=4)
+        logger.info(f"Saved simulated portfolio state. Cash: ${simulated_cash:.2f}, NAV: ${total_nav:.2f}")
+    except Exception as e:
+        logger.error(f"Failed to save simulated portfolio: {e}")
+    
     await send_discord_report(active_trades)
     
-    # 7. Git commit and push
     try:
         subprocess.run(["git", "add", edges_file_path, "data/historical/"], check=True)
-        # Check if there are staged changes to commit
         staged = subprocess.run(["git", "diff", "--cached", "--quiet"])
         if staged.returncode == 1:
             subprocess.run(["git", "commit", "-m", "Add daily PnL breakdown to tracking dashboard"], check=True)

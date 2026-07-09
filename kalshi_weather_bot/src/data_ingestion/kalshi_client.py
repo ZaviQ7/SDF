@@ -78,6 +78,36 @@ class KalshiWeatherClient:
         self.simulated_positions: Dict[str, Dict[str, Any]] = {}
         self.simulated_orders: Dict[str, Dict[str, Any]] = {}
         
+    def _load_simulated_balance(self):
+        portfolio_path = os.path.join("data", "historical", "simulated_portfolio.json")
+        if os.path.exists(portfolio_path):
+            try:
+                with open(portfolio_path, "r") as f:
+                    data = json.load(f)
+                self.simulated_balance = float(data.get("bankroll", 15.00))
+                logger.info(f"Loaded persistent simulated balance: ${self.simulated_balance:.2f}")
+            except Exception as e:
+                logger.warning(f"Error loading simulated portfolio file: {e}. Using default.")
+        else:
+            logger.info(f"Simulated portfolio file not found at {portfolio_path}. Using config bankroll.")
+
+    def _save_simulated_balance(self):
+        portfolio_path = os.path.join("data", "historical", "simulated_portfolio.json")
+        os.makedirs(os.path.dirname(portfolio_path), exist_ok=True)
+        try:
+            if os.path.exists(portfolio_path):
+                with open(portfolio_path, "r") as f:
+                    data = json.load(f)
+            else:
+                data = {}
+            data["bankroll"] = self.simulated_balance
+            data["last_updated"] = datetime.utcnow().isoformat() + "Z"
+            with open(portfolio_path, "w") as f:
+                json.dump(data, f, indent=4)
+            logger.info(f"Saved persistent simulated balance: ${self.simulated_balance:.2f}")
+        except Exception as e:
+            logger.error(f"Error saving simulated portfolio file: {e}")
+
     async def initialize(self) -> bool:
         """Initialize HTTP session, load key, and authenticate."""
         logger.info("Initializing Kalshi API v2 client...")
@@ -115,6 +145,8 @@ class KalshiWeatherClient:
                 logger.error(f"❌ Real Kalshi authentication failed: {e}. Falling back to simulation mode.")
                 self.dry_run = True
                 
+        if self.dry_run:
+            self._load_simulated_balance()
         logger.info(f"✅ Simulation mode active. Bankroll: ${self.simulated_balance:.2f}")
         return True
 
@@ -411,6 +443,7 @@ class KalshiWeatherClient:
                 
                 if self.simulated_balance >= total_cost:
                     self.simulated_balance -= total_cost
+                    self._save_simulated_balance()
                     
                     # Update position
                     if ticker in self.simulated_positions:

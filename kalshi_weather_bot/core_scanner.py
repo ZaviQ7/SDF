@@ -166,12 +166,6 @@ async def fetch_nws_actual_high_low(
 # ---------------------------------------------------------------------------
 # Open-Meteo Ensemble and HRRR Forecast Downloaders
 # ---------------------------------------------------------------------------
-# (short_name, request_model, response_suffix)
-# In combined mode, Open-Meteo renames some models in the response keys:
-#   gfs_seamless       → ncep_gefs_seamless
-#   icon_seamless      → icon_seamless_eps
-#   gem_global         → gem_global_ensemble
-#   ecmwf_ifs025_ensemble stays the same
 ENSEMBLE_MODELS = [
     ("ecmwf", "ecmwf_ifs025_ensemble", "ecmwf_ifs025_ensemble"),
     ("gfs",   "gfs_seamless",          "ncep_gefs_seamless"),
@@ -183,12 +177,7 @@ ENSEMBLE_MODELS = [
 async def download_all_ensembles(
     lat: float, lon: float, target_date: str, timezone: str
 ) -> Dict[str, Optional[Dict[str, Any]]]:
-    """Download ALL ensemble models in a single API call to minimise request count.
-
-    Open-Meteo supports comma-separated models.  In combined mode the hourly
-    keys use the model name as a **suffix**, e.g.
-    ``temperature_2m_member01_ecmwf_ifs025_ensemble``.
-    """
+    """Download ALL ensemble models in a single API call to minimize request count."""
     model_names = [req for _, req, _ in ENSEMBLE_MODELS]
     models_param = ",".join(model_names)
     url = (
@@ -239,9 +228,6 @@ async def download_all_ensembles(
 
                         results: Dict[str, Optional[Dict[str, Any]]] = {}
                         for short_name, req_name, resp_suffix in ENSEMBLE_MODELS:
-                            # Keys end with the model suffix, e.g.
-                            # temperature_2m_ecmwf_ifs025_ensemble  (control)
-                            # temperature_2m_member01_ecmwf_ifs025_ensemble
                             member_keys = [
                                 k for k in all_keys
                                 if k.endswith(f"_{resp_suffix}")
@@ -253,9 +239,6 @@ async def download_all_ensembles(
 
                             member_forecasts = {}
                             for key in member_keys:
-                                # Strip the model suffix to get the member part
-                                # e.g. "temperature_2m_member01_ecmwf_ifs025_ensemble"
-                                #   → base = "temperature_2m_member01"
                                 base = key[:-(len(resp_suffix) + 1)]  # strip "_suffix"
                                 if base == "temperature_2m":
                                     clean = "control"
@@ -299,7 +282,7 @@ async def download_all_ensembles(
 async def download_hrrr(
     lat: float, lon: float, target_date: str, timezone: str
 ) -> Optional[Dict[str, Any]]:
-    """Download deterministic high-resolution CONUS HRRR forecast from Open-Meteo."""
+    """Download deterministic high-resolution CONUS HRRR forecast with robust exponential backoff retries."""
     url = (
         f"https://api.open-meteo.com/v1/forecast"
         f"?latitude={lat}&longitude={lon}"
@@ -311,39 +294,46 @@ async def download_hrrr(
     )
     headers = {"User-Agent": "Mozilla/5.0 (kalshi-ev-scanner-v2)"}
 
-    try:
-        async with _api_semaphore:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as resp:
-                    if resp.status == 200:
+    max_retries = 3
+    backoff = 2.0
+    for attempt in range(max_retries):
+        try:
+            async with _api_semaphore:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers, timeout=15) as resp:
+                        if resp.status == 429:
+                            logger.warning(f"Rate limited (429) for HRRR. Retrying in {backoff}s...")
+                            await asyncio.sleep(backoff)
+                            backoff *= 2
+                            continue
+                        elif resp.status != 200:
+                            text = await resp.text()
+                            logger.error(f"Open-Meteo HRRR API error ({resp.status}): {text}")
+                            return None
+
                         data = await resp.json()
                         hourly = data.get("hourly", {})
                         times = hourly.get("time", [])
-                        temp_data = hourly.get(
-                            "temperature_2m_ncep_hrrr_conus"
-                        ) or hourly.get("temperature_2m", [])
+                        temp_data = hourly.get("temperature_2m_ncep_hrrr_conus") or hourly.get("temperature_2m", [])
 
-                        indices = [
-                            i
-                            for i, t in enumerate(times)
-                            if t.startswith(target_date)
-                        ]
+                        indices = [i for i, t in enumerate(times) if t.startswith(target_date)]
                         if not indices:
                             return None
 
-                        temps = [
-                            temp_data[idx]
-                            for idx in indices
-                            if temp_data[idx] is not None
-                        ]
+                        temps = [temp_data[idx] for idx in indices if temp_data[idx] is not None]
                         if temps:
                             return {
                                 "source": "HRRR",
                                 "target_date": target_date,
                                 "temps": temps,
                             }
-    except Exception as e:
-        logger.error(f"Error downloading HRRR: {e}")
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Error downloading HRRR after {max_retries} attempts: {e}")
+                return None
+            logger.warning(f"Error downloading HRRR (attempt {attempt+1}/{max_retries}): {e}. Retrying...")
+            await asyncio.sleep(backoff)
+            backoff *= 2
     return None
 
 
@@ -354,9 +344,6 @@ async def get_forecasts_for_date(
     lat: float, lon: float, target_date: str, timezone_str: str
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """Retrieve and cache GFS, ECMWF, ICON, GEM, and HRRR forecasts for a given coordinate & date."""
-
-    # --- Ensemble models (single combined API call) ---
-    # Check if ALL ensemble models are cached
     ensemble_cache_keys = {
         s: _cache_key(m, lat, lon, target_date) for s, m, _ in ENSEMBLE_MODELS
     }
@@ -365,13 +352,11 @@ async def get_forecasts_for_date(
     if all_cached:
         results = {s: _get_cached(k) for s, k in ensemble_cache_keys.items()}
     else:
-        # One API call fetches all 4 ensemble models
         results = await download_all_ensembles(lat, lon, target_date, timezone_str)
         for short_name, cache_key in ensemble_cache_keys.items():
             if results.get(short_name):
                 _set_cached(cache_key, results[short_name])
 
-    # --- HRRR (separate endpoint) ---
     hrrr_key = _cache_key("ncep_hrrr_conus", lat, lon, target_date)
     hrrr_cached = _get_cached(hrrr_key)
     if hrrr_cached is not None:
@@ -399,16 +384,12 @@ async def run_scan(
     cities: List[Dict[str, Any]],
     on_progress: Optional[Callable[[str], None]] = None,
 ) -> List[Dict[str, Any]]:
-    """
-    Run the full weather expert mixture ensemble scan across all active cities.
-    """
-
+    """Run the full weather expert mixture ensemble scan across all active cities."""
     def progress(msg: str):
         logger.info(msg)
         if on_progress:
             on_progress(msg)
 
-    # Init components
     config["kalshi"]["environment"] = "prod"
     config["kalshi"]["simulation"] = True
     config["kalshi"]["trading"]["min_edge_threshold"] = 0.05
@@ -423,7 +404,7 @@ async def run_scan(
     await client.initialize()
 
     all_edges = []
-    cumulative_exposure = 0.0  # Track across scan for Kelly sizing
+    cumulative_exposure = 0.0
     active_cities = [c for c in cities if c.get("active", True)]
 
     for idx, city in enumerate(active_cities):
@@ -446,7 +427,6 @@ async def run_scan(
             ("LOW", city["kalshi_market_prefix_low"]),
         ]
 
-        # Download forecasts once per city (with caching)
         forecasts_by_date = {}
         for target_date in target_dates:
             forecasts_by_date[target_date] = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
@@ -457,25 +437,19 @@ async def run_scan(
                 continue
 
             for target_date in target_dates:
-                # Skip already-determined same-day contracts
                 today_str = local_now.strftime("%Y-%m-%d")
                 if target_date == today_str:
                     local_hour = local_now.hour
                     if temp_type == "HIGH" and local_hour >= 15:
-                        logger.info(
-                            f"  Skipping {city_name} today HIGH (past 3PM local)."
-                        )
+                        logger.info(f"  Skipping {city_name} today HIGH (past 3PM local).")
                         continue
                     if temp_type == "LOW" and local_hour >= 3:
-                        logger.info(
-                            f"  Skipping {city_name} today LOW (past 3AM local)."
-                        )
+                        logger.info(f"  Skipping {city_name} today LOW (past 3AM local).")
                         continue
 
                 try:
                     dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
                     date_ticker_str = dt_obj.strftime("%y%b%d").upper()
-                    # Compute lead hours to target date
                     target_dt = tz.localize(datetime.combine(dt_obj.date(), datetime.max.time()))
                     hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
                 except Exception:
@@ -509,19 +483,12 @@ async def run_scan(
                 if len(pooled_temps) == 0:
                     continue
 
-                # Real-time NWS clipping is disabled to avoid sensor outlier/mismatch contamination.
-                # Relying entirely on models (such as hourly HRRR updates) for active predictions.
-
                 stats = model_processor.get_distribution_stats(pooled_temps)
-                logger.info(
-                    f"  {city_name} {temp_type} forecast: Mean={stats['mean']:.1f}°F, Std={stats['std']:.1f}°F"
-                )
+                logger.info(f"  {city_name} {temp_type} forecast: Mean={stats['mean']:.1f}°F, Std={stats['std']:.1f}°F")
 
-                # Calculate model probabilities for each contract
                 model_probabilities = {}
                 for m in date_markets:
                     ticker = m["ticker"]
-                    # Skip cross-contamination from substring matching in Kalshi API
                     ticker_type = "HIGH" if "HIGH" in ticker else "LOW"
                     if ticker_type != temp_type:
                         continue
@@ -529,18 +496,12 @@ async def run_scan(
                     rtype, val1, val2 = parse_range(m["title"])
                     if not rtype:
                         continue
-                    prob = calculate_market_probability(
-                        rtype, val1, val2, pooled_temps
-                    )
+                    prob = calculate_market_probability(rtype, val1, val2, pooled_temps)
                     model_probabilities[ticker] = prob
 
-                # Find edges
                 edges = edge_detector.find_edges(date_markets, model_probabilities)
                 for edge in edges:
-                    size = risk_manager.calculate_position_size(
-                        edge, risk_manager.bankroll, cumulative_exposure
-                    )
-                    # Track cumulative exposure
+                    size = risk_manager.calculate_position_size(edge, risk_manager.bankroll, cumulative_exposure)
                     cumulative_exposure += edge["entry_price"] * size
 
                     all_edges.append(
@@ -566,9 +527,6 @@ async def run_scan(
                     )
 
     await client.close()
-
-    # Sort by descending EV
     all_edges.sort(key=lambda x: x["net_ev"], reverse=True)
-
     progress(f"Scan completed. {len(all_edges)} edges found.")
     return all_edges

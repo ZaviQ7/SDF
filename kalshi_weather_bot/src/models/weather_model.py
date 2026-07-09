@@ -83,7 +83,12 @@ class WeatherModelProcessor:
                 
             if hrrr_raw:
                 hrrr_val = max(hrrr_raw) if temp_type == "HIGH" else min(hrrr_raw)
-                model_temps["hrrr"] = [hrrr_val + self.bias_correction_value + bias_offset]
+                # Dynamic standard error based on lead hours (RMSE scales from ~0.5F near-term to 2.0F at 48h)
+                hrrr_sd = max(0.5, min(2.0, 0.5 + 0.03 * hours_to_target))
+                # Dress the deterministic HRRR forecast with normal noise to represent model uncertainty.
+                # This prevents a zero-variance "delta spike" in the resampled mixture distribution.
+                hrrr_samples = np.random.normal(loc=hrrr_val, scale=hrrr_sd, size=50)
+                model_temps["hrrr"] = list(hrrr_samples + self.bias_correction_value + bias_offset)
 
         # Determine mixture weights for active models
         active_models = [m for m, temps in model_temps.items() if len(temps) > 0]

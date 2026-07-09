@@ -139,6 +139,15 @@ class BiasTracker:
                 if target_date >= local_today:
                     continue
                     
+                # Skip if the date is more than 3 days old to avoid infinite NWS retry loops on dead/unresolvable dates
+                try:
+                    entry_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+                    today_date = datetime.now(tz).date()
+                    if (today_date - entry_date).days > 3:
+                        continue
+                except Exception:
+                    pass
+                    
                 # Fetch NWS actual observed High/Low
                 actual_val = await self.fetch_yesterday_actual(station, target_date, tz_str, temp_type)
                 if actual_val is not None:

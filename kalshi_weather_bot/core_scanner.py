@@ -432,6 +432,11 @@ async def run_scan(
             forecasts_by_date[target_date] = await get_forecasts_for_date(lat, lon, target_date, timezone_str)
 
         for temp_type, prefix in scans:
+            # Set target times to actual meteorological event windows
+            # LOWs usually bottom out around 7 AM, HIGHs peak around 4 PM
+            from datetime import time as dt_time
+            target_time = dt_time(7, 0) if temp_type == "LOW" else dt_time(16, 0)
+
             markets = await client.get_weather_markets(prefix)
             if not markets:
                 continue
@@ -444,13 +449,15 @@ async def run_scan(
                         logger.info(f"  Skipping {city_name} today HIGH (past 3PM local).")
                         continue
                     if temp_type == "LOW" and local_hour >= 3:
-                        logger.info(f"  Skipping {city_name} today LOW (past 3AM local).")
+                        logger.info(f"  Skiipping {city_name} today LOW (past 3AM local).")
                         continue
 
                 try:
                     dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
                     date_ticker_str = dt_obj.strftime("%y%b%d").upper()
-                    target_dt = tz.localize(datetime.combine(dt_obj.date(), datetime.max.time()))
+                    
+                    # Compute lead hours directly to the physical weather event instead of midnight
+                    target_dt = tz.localize(datetime.combine(dt_obj.date(), target_time))
                     hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
                 except Exception:
                     continue

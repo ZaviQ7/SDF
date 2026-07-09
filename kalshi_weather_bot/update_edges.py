@@ -392,8 +392,8 @@ async def run_update():
                 except Exception:
                     hours_to_target = 24.0
                     
-                today_str = local_now.strftime("%Y-%m-%d")
-                if target_date == today_str:
+                today_loop_str = local_now.strftime("%Y-%m-%d")
+                if target_date == today_loop_str:
                     local_hour = local_now.hour
                     if temp_type == "HIGH" and local_hour >= 15:
                         continue
@@ -493,6 +493,7 @@ async def run_update():
             
         for edge in no_list:
             edge["group_no_count"] = len(no_list)
+            edge["excluding_no"] = len(no_list) > 1
             final_candidate_edges.append(edge)
             
     for edge in final_candidate_edges:
@@ -587,9 +588,29 @@ async def run_update():
             
     logged_trades = updated_logged_trades
             
+    # 2.2 Sort new edges by EV descending so we allocate capital to the best edges first
     new_edges.sort(key=lambda x: x.get("net_ev", 0.0), reverse=True)
+    
+    # Unified Anchor: Get the current hour and date string in Eastern time to gate deployment windows safely
+    eastern = pytz.timezone("America/New_York")
+    now_edt = datetime.now(eastern)
+    current_hour_edt = now_edt.hour
+    today_str = now_edt.strftime("%Y-%m-%d")
+    
     for ne in new_edges:
         ticker = ne["ticker"]
+        
+        # Guardrail 1: Never buy far-out targets
+        if ne["target_date"] != today_str:
+            logger.info(f"⏭️ Skipping execution for far-out market {ticker}. Waiting for same-day short-range cycle.")
+            continue
+            
+        # Guardrail 2: Do not buy same-day HIGHs during the overnight run (Wait for the 1:15 PM run)
+        if ne["temp_type"] == "HIGH" and current_hour_edt < 12:
+            logger.info(f"⏭️ Gating HIGH contract {ticker} until the 1:15 PM high-weight HRRR run.")
+            continue
+            
+        # Check if already logged
         if not any(t["ticker"] == ticker for t in logged_trades):
             city = ne["city"]
             ttype = ne["temp_type"]

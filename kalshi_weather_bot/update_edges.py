@@ -335,6 +335,12 @@ async def run_update():
     detected_edges_registry = {}
     cached_pooled_temps = {}
     
+    # Unified Time Anchor Configuration to prevent NameErrors in --settle-only blocks
+    eastern = pytz.timezone("America/New_York")
+    now_edt = datetime.now(eastern)
+    current_hour_edt = now_edt.hour
+    today_str = now_edt.strftime("%Y-%m-%d")
+    
     if settle_only:
         logger.info("Running in SETTLE-ONLY mode. Skipping forecast model downloads and new edge scanning.")
         cities_to_scan = []
@@ -359,6 +365,11 @@ async def run_update():
         ]
         
         for target_date in target_dates:
+            # ─── SHORT-CIRCUIT GUARDRAIL 1: SKIP FAR-OUT TARGET DATES IMMEDIATELY ───
+            if target_date != today_str:
+                continue
+            # ────────────────────────────────────────────────────────────────────────
+            
             try:
                 dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
                 date_ticker_str = dt_obj.strftime("%y%b%d").upper()
@@ -383,6 +394,13 @@ async def run_update():
             ]
             
             for temp_type, prefix in scans:
+                # ─── SHORT-CIRCUIT GUARDRAIL 2: SKIP UNOPTIMAL SAME-DAY TARGET TYPES ───
+                if temp_type == "HIGH" and current_hour_edt < 12:
+                    continue  # Protect overnight run from high-variance afternoon noise
+                if temp_type == "LOW" and current_hour_edt >= 12:
+                    continue  # Protect afternoon run from processing stale morning data
+                # ────────────────────────────────────────────────────────────────────────
+                
                 from datetime import time as dt_time
                 target_time = dt_time(7, 0) if temp_type == "LOW" else dt_time(16, 0)
                 
@@ -588,14 +606,8 @@ async def run_update():
             
     logged_trades = updated_logged_trades
             
-    # 2.2 Sort new edges by EV descending so we allocate capital to the best edges first
+    # Sort new edges by EV descending so we allocate capital to the best edges first
     new_edges.sort(key=lambda x: x.get("net_ev", 0.0), reverse=True)
-    
-    # Unified Anchor: Get the current hour and date string in Eastern time to gate deployment windows safely
-    eastern = pytz.timezone("America/New_York")
-    now_edt = datetime.now(eastern)
-    current_hour_edt = now_edt.hour
-    today_str = now_edt.strftime("%Y-%m-%d")
     
     for ne in new_edges:
         ticker = ne["ticker"]

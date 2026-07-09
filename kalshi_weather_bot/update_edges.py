@@ -11,10 +11,10 @@ import subprocess
 from datetime import datetime, timedelta
 import numpy as np
 
-# Add project root to python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.data_ingestion.kalshi_client import KalshiWeatherClient
+from src.data_ingestion.nbm_client import NBMTextClient
 from src.models.weather_model import WeatherModelProcessor
 from src.models.probability import calculate_market_probability
 from src.trading.edge_detector import EdgeDetector
@@ -23,16 +23,13 @@ from src.utils.helpers import parse_range, calculate_maker_fee
 from src.utils.bias_tracker import BiasTracker
 from core_scanner import get_forecasts_for_date, fetch_nws_actual_high_low
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("updater")
 logger.setLevel(logging.INFO)
 
-# Map city names to NWS airport stations and timezones (populated dynamically from cities.yaml)
 CITY_STATIONS = {}
 
 def evaluate_contract(ticker: str, play_desc: str, actual_temp: float) -> bool | None:
-    """Evaluate if a weather range contract settled YES (True) or NO (False)."""
     rtype, val1, val2 = parse_range(play_desc)
     if not rtype:
         parts = ticker.split("-")
@@ -64,7 +61,6 @@ def evaluate_contract(ticker: str, play_desc: str, actual_temp: float) -> bool |
     return None
 
 def parse_logged_trades(file_path: str) -> list:
-    """Parse existing weather trades from theoretical_edges.md."""
     if not os.path.exists(file_path):
         return []
         
@@ -186,7 +182,6 @@ async def send_discord_report(active_trades: list):
 async def run_update():
     logger.info("Running weather scan for today and tomorrow...")
     
-    # 1. Load Configurations
     config_path = os.path.join("config", "settings.yaml")
     cities_path = os.path.join("config", "cities.yaml")
     
@@ -248,9 +243,6 @@ async def run_update():
     logged_trades = parse_logged_trades(edges_file_path)
     logger.info(f"Loaded {len(logged_trades)} existing trades from log.")
 
-    # =======================================================================
-    # STEP 1: AUTO-SETTLE OPEN TRADES FIRST (Liquidate positions to unlock capital)
-    # =======================================================================
     logger.info("Checking for open weather trades to auto-settle...")
     for t in logged_trades:
         if "Open" in t["status"]:
@@ -317,9 +309,6 @@ async def run_update():
                             
                     logger.info(f"Auto-settled trade {t['ticker']} on {trade_date_str}: {t['status']}")
 
-    # =======================================================================
-    # STEP 2: RUN BANKROLL ALLOCATION & SIZE TOMORROW'S OPPORTUNITIES
-    # =======================================================================
     initial_open_exposure = 0.0
     for t in logged_trades:
         if "Open" in t["status"]:
@@ -335,11 +324,16 @@ async def run_update():
     detected_edges_registry = {}
     cached_pooled_temps = {}
     
-    # Unified Time Anchor Configuration to prevent NameErrors in --settle-only blocks
     eastern = pytz.timezone("America/New_York")
     now_edt = datetime.now(eastern)
     current_hour_edt = now_edt.hour
     today_str = now_edt.strftime("%Y-%m-%d")
+
+    nbm_data = {}
+    if not settle_only:
+        logger.info("Executing Single-Fetch Bulk Harvest for National Blend of Models (NBH) text cards...")
+        nbm_client = NBMTextClient()
+        nbm_data = await nbm_client.fetch_latest_nbm_cards()
     
     if settle_only:
         logger.info("Running in SETTLE-ONLY mode. Skipping forecast model downloads and new edge scanning.")
@@ -365,10 +359,8 @@ async def run_update():
         ]
         
         for target_date in target_dates:
-            # ─── SHORT-CIRCUIT GUARDRAIL 1: SKIP FAR-OUT TARGET DATES IMMEDIATELY ───
             if target_date != today_str:
                 continue
-            # ────────────────────────────────────────────────────────────────────────
             
             try:
                 dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
@@ -394,12 +386,10 @@ async def run_update():
             ]
             
             for temp_type, prefix in scans:
-                # ─── SHORT-CIRCUIT GUARDRAIL 2: SKIP UNOPTIMAL SAME-DAY TARGET TYPES ───
                 if temp_type == "HIGH" and current_hour_edt < 12:
-                    continue  # Protect overnight run from high-variance afternoon noise
+                    continue  
                 if temp_type == "LOW" and current_hour_edt >= 12:
-                    continue  # Protect afternoon run from processing stale morning data
-                # ────────────────────────────────────────────────────────────────────────
+                    continue 
                 
                 from datetime import time as dt_time
                 target_time = dt_time(7, 0) if temp_type == "LOW" else dt_time(16, 0)
@@ -407,8 +397,10 @@ async def run_update():
                 try:
                     target_dt = tz.localize(datetime.combine(dt_obj.date(), target_time))
                     hours_to_target = (target_dt - local_now).total_seconds() / 3600.0
+                    target_utc_hour = target_dt.astimezone(pytz.utc).hour
                 except Exception:
                     hours_to_target = 24.0
+                    target_utc_hour = 11 if temp_type == "LOW" else 20
                     
                 today_loop_str = local_now.strftime("%Y-%m-%d")
                 if target_date == today_loop_str:
@@ -440,7 +432,10 @@ async def run_update():
                     hrrr_data=hrrr_forecast,
                     icon_data=icon_forecast,
                     gem_data=gem_forecast,
-                    hours_to_target=hours_to_target
+                    hours_to_target=hours_to_target,
+                    station_id=city.get("nws_station_id"),
+                    nbm_data=nbm_data,
+                    target_utc_hour=target_utc_hour
                 )
                 if len(pooled_temps) == 0:
                     continue
@@ -606,23 +601,19 @@ async def run_update():
             
     logged_trades = updated_logged_trades
             
-    # Sort new edges by EV descending so we allocate capital to the best edges first
     new_edges.sort(key=lambda x: x.get("net_ev", 0.0), reverse=True)
     
     for ne in new_edges:
         ticker = ne["ticker"]
         
-        # Guardrail 1: Never buy far-out targets
         if ne["target_date"] != today_str:
             logger.info(f"⏭️ Skipping execution for far-out market {ticker}. Waiting for same-day short-range cycle.")
             continue
             
-        # Guardrail 2: Do not buy same-day HIGHs during the overnight run (Wait for the 1:15 PM run)
         if ne["temp_type"] == "HIGH" and current_hour_edt < 12:
             logger.info(f"⏭️ Gating HIGH contract {ticker} until the 1:15 PM high-weight HRRR run.")
             continue
             
-        # Check if already logged
         if not any(t["ticker"] == ticker for t in logged_trades):
             city = ne["city"]
             ttype = ne["temp_type"]
@@ -682,7 +673,6 @@ async def run_update():
             
     historical_trades.sort(key=lambda x: datetime.strptime(x["formatted_date"], "%b %d, %Y") if "%" not in x["formatted_date"] else datetime.now(), reverse=True)
 
-    # 5. Calculate Running Performance Stats & Daily Breakdown
     total_trades = len(historical_trades)
     wins = sum(1 for t in historical_trades if "Won" in t["status"])
     losses = total_trades - wins
@@ -747,7 +737,6 @@ async def run_update():
             sortino = (mean_return / std_downside) * np.sqrt(365)
             sortino_ratio_str = f"{sortino:.2f}"
             
-    # 6. Rebuild Markdown Content
     markdown_lines = [
         "# Weather Arbitrage Tracker Dashboard",
         "",
@@ -854,7 +843,9 @@ async def run_update():
         port_data["cash_balance"] = simulated_cash
         port_data["bankroll"] = total_nav
         port_data["net_pnl"] = net_pnl
-        port_data["last_updated"] = datetime.utcnow().isoformat() + "Z"
+        # Updated datetime method
+        now_utc = datetime.now(timezone.utc)
+        port_data["last_updated"] = now_utc.isoformat()
         with open(portfolio_file, "w") as f:
             json.dump(port_data, f, indent=4)
         logger.info(f"Saved simulated portfolio state. Cash: ${simulated_cash:.2f}, NAV: ${total_nav:.2f}")

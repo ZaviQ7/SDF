@@ -1,39 +1,37 @@
-# Theoretical Edges & Trade Tracking Log
+# Weather Arbitrage Tracker Dashboard
 
-Use this file to log and track your +EV trades, expected probabilities, and actual outcomes to verify your edge.
+This dashboard tracks the simulated portfolio performance of the automated weather model edge detector.
+
+*   **Total Portfolio NAV (Equity):** $26.04 USD
+*   **Cash Reserves:** $12.55 USD
+*   **Open Exposure (Capital Risked):** $13.49 USD
+*   **Net Profit/Loss:** +$11.04 USD
+*   **Win Rate:** 43.5% (10 Won / 13 Lost)
+*   **Sharpe Ratio (Annualized):** N/A
+*   **Sortino Ratio (Annualized):** N/A
 
 ## 📊 Running Performance Summary
-*   **Total Trades Logged:** 15
-*   **Win/Loss Record:** 6 wins / 9 losses
-*   **Total Capital Risked:** $19.72
-*   **Total Payout:** $17.00
-*   **Net Profit:** $-2.72 (ROI: -13.8%)
+*   **Total Trades Logged:** 23
+*   **Total Capital Risked:** $29.19
+*   **Total Payout:** $26.00
 
 ### 📅 Daily Performance History
 
 | Date | Win / Loss | Risked | Payout | Net PnL | ROI |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Jul 08, 2026 | 6 W / 9 L | $19.72 | $17.00 | $-2.72 | -13.8% |
+| Jul 08, 2026 | 10 W / 13 L | $29.19 | $26.00 | $-3.19 | -10.9% |
 
 ---
 
-
-
----
-
-## 🔮 Active Weather Edges for Jul 08, 2026
-*These represent active predictions for Jul 08, 2026. Spreads and EV are live as of generating.*
+## 🔮 Active Weather Edges for Jul 09, 2026
+*These represent active predictions for Jul 09, 2026. Spreads and EV are live as of generating.*
 
 | Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Jul 08, 2026 | **San Francisco Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtsfo/a/kxlowtsfo-26jul08))<br>`KXLOWTSFO-26JUL08-B53.5` | **Buy YES** 53-54° @ 26¢ | 5 | $1.30 + $0.02 fee<br>**($1.32 total)** | 58.1% | +263.2% | $5.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **San Francisco Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtsfo/a/kxlowtsfo-26jul08))<br>`KXLOWTSFO-26JUL08-B55.5` | **Buy NO** 55-56° @ 41¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 1 | $0.41 + $0.01 fee<br>**($0.42 total)** | 65.5% | +244.8% | $1.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **Phoenix Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtphx/a/kxlowtphx-26jul08))<br>`KXLOWTPHX-26JUL08-T91` | **Buy NO** >91° @ 47¢<br>⚠️ *Correlated NO (Scaled 1/3)* | 6 | $2.82 + $0.03 fee<br>**($2.85 total)** | 90.1% | +87.7% | $6.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **San Francisco High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsfo/a/kxhightsfo-26jul08))<br>`KXHIGHTSFO-26JUL08-B67.5` | **Buy NO** 67-68° @ 67¢<br>⚠️ *Correlated NO (Scaled 1/3)* | 1 | $0.67 + $0.01 fee<br>**($0.68 total)** | 93.8% | +21.8% | $1.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **Phoenix High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxhightphx/a/kxhightphx-26jul08))<br>`KXHIGHTPHX-26JUL08-B113.5` | **Buy NO** 113-114° @ 49¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 1 | $0.49 + $0.01 fee<br>**($0.50 total)** | 33.2% | +18.5% | $1.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **San Francisco High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsfo/a/kxhightsfo-26jul08))<br>`KXHIGHTSFO-26JUL08-B65.5` | **Buy NO** 65-66° @ 57¢<br>⚠️ *Correlated NO (Scaled 1/3)* | 1 | $0.58 + $0.01 fee<br>**($0.59 total)** | 64.0% | +8.5% | $1.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **Phoenix High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxhightphx/a/kxhightphx-26jul08))<br>`KXHIGHTPHX-26JUL08-B115.5` | **Buy NO** 115-116° @ 74¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 2 | $1.48 + $0.01 fee<br>**($1.49 total)** | 93.1% | -1.0% | $2.00 | **Open** / *Pending* |
-| Jul 08, 2026 | **Phoenix Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtphx/a/kxlowtphx-26jul08))<br>`KXLOWTPHX-26JUL08-B90.5` | **Buy YES** 90-91° @ 32¢<br>⚠️ *Overlapping YES Play* | 5 | $1.60 + $0.02 fee<br>**($1.62 total)** | 35.6% | -17.3% | $5.00 | **Open** / *Pending* |
+| Jul 09, 2026 | **San Francisco Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtsfo/a/kxlowtsfo-26jul09))<br>`KXLOWTSFO-26JUL09-B54.5` | **Buy NO** 54-55° @ 32¢ | 10 | $3.20 + $0.04 fee<br>**($3.24 total)** | 68.6% | +107.9% | $10.00 | **Open** / *Pending* |
+| Jul 09, 2026 | **Atlanta Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KATL.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtatl/a/kxlowtatl-26jul09))<br>`KXLOWTATL-26JUL09-B76.5` | **Buy NO** 76-77° @ 77¢ | 8 | $6.16 + $0.03 fee<br>**($6.19 total)** | 99.0% | +26.9% | $8.00 | **Open** / *Pending* |
+| Jul 09, 2026 | **Seattle Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSEA.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtsea/a/kxlowtsea-26jul09))<br>`KXLOWTSEA-26JUL09-B52.5` | **Buy NO** 52-53° @ 66¢ | 3 | $1.98 + $0.02 fee<br>**($2.00 total)** | 78.7% | +17.5% | $3.00 | **Open** / *Pending* |
+| Jul 09, 2026 | **Houston Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KHOU.html) • [Kalshi Link](https://kalshi.com/markets/kxlowthou/a/kxlowthou-26jul09))<br>`KXLOWTHOU-26JUL09-B78.5` | **Buy NO** 78-79° @ 68¢ | 3 | $2.04 + $0.02 fee<br>**($2.06 total)** | 81.1% | +17.5% | $3.00 | **Open** / *Pending* |
 
 ---
 
@@ -42,6 +40,14 @@ Use this file to log and track your +EV trades, expected probabilities, and actu
 
 | Target Date | Location & Ticker | Action / Play | Qty | Total Cost | True Prob | Net EV | Est. Payout | Status / Profit |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Jul 08, 2026 | **San Francisco Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtsfo/a/kxlowtsfo-26jul08))<br>`KXLOWTSFO-26JUL08-B53.5` | **Buy YES** 53-54° @ 26¢ | 5 | $1.30 + $0.02 fee<br>**($1.32 total)** | 58.1% | +263.2% | $5.00 | ✅ **Won (+$3.68)** |
+| Jul 08, 2026 | **San Francisco Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtsfo/a/kxlowtsfo-26jul08))<br>`KXLOWTSFO-26JUL08-B55.5` | **Buy NO** 55-56° @ 41¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 1 | $0.41 + $0.01 fee<br>**($0.42 total)** | 65.5% | +244.8% | $1.00 | ✅ **Won (+$0.58)** |
+| Jul 08, 2026 | **Phoenix Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtphx/a/kxlowtphx-26jul08))<br>`KXLOWTPHX-26JUL08-T91` | **Buy NO** >91° @ 47¢<br>⚠️ *Correlated NO (Scaled 1/3)* | 6 | $2.82 + $0.03 fee<br>**($2.85 total)** | 90.1% | +87.7% | $6.00 | ❌ **Lost (-$2.85)** |
+| Jul 08, 2026 | **San Francisco High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsfo/a/kxhightsfo-26jul08))<br>`KXHIGHTSFO-26JUL08-B67.5` | **Buy NO** 67-68° @ 67¢<br>⚠️ *Correlated NO (Scaled 1/3)* | 1 | $0.67 + $0.01 fee<br>**($0.68 total)** | 93.8% | +21.8% | $1.00 | ✅ **Won (+$0.32)** |
+| Jul 08, 2026 | **Phoenix High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxhightphx/a/kxhightphx-26jul08))<br>`KXHIGHTPHX-26JUL08-B113.5` | **Buy NO** 113-114° @ 49¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 1 | $0.49 + $0.01 fee<br>**($0.50 total)** | 33.2% | +18.5% | $1.00 | ❌ **Lost (-$0.50)** |
+| Jul 08, 2026 | **San Francisco High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KSFO.html) • [Kalshi Link](https://kalshi.com/markets/kxhightsfo/a/kxhightsfo-26jul08))<br>`KXHIGHTSFO-26JUL08-B65.5` | **Buy NO** 65-66° @ 57¢<br>⚠️ *Correlated NO (Scaled 1/3)* | 1 | $0.58 + $0.01 fee<br>**($0.59 total)** | 64.0% | +8.5% | $1.00 | ❌ **Lost (-$0.59)** |
+| Jul 08, 2026 | **Phoenix High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxhightphx/a/kxhightphx-26jul08))<br>`KXHIGHTPHX-26JUL08-B115.5` | **Buy NO** 115-116° @ 74¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 2 | $1.48 + $0.01 fee<br>**($1.49 total)** | 93.1% | -1.0% | $2.00 | ✅ **Won (+$0.51)** |
+| Jul 08, 2026 | **Phoenix Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHX.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtphx/a/kxlowtphx-26jul08))<br>`KXLOWTPHX-26JUL08-B90.5` | **Buy YES** 90-91° @ 32¢<br>⚠️ *Overlapping YES Play* | 5 | $1.60 + $0.02 fee<br>**($1.62 total)** | 35.6% | -17.3% | $5.00 | ❌ **Lost (-$1.62)** |
 | Jul 08, 2026 | **Oklahoma City Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KOKC.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtokc/a/kxlowtokc-26jul08))<br>`KXLOWTOKC-26JUL08-T73` | **Buy YES** >73° @ 30¢ | 10 | $3.00 + $0.04 fee<br>**($3.04 total)** | 86.9% | +180.2% | $10.00 | ❌ **Lost (-$3.04)** |
 | Jul 08, 2026 | **Philadelphia High** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KPHL.html) • [Kalshi Link](https://kalshi.com/markets/kxhighphil/a/kxhighphil-26jul08))<br>`KXHIGHPHIL-26JUL08-B85.5` | **Buy NO** 85-86° @ 54¢<br>⚠️ *Correlated NO (Scaled 1/2)* | 1 | $0.54 + $0.01 fee<br>**($0.55 total)** | 85.5% | +71.0% | $1.00 | ❌ **Lost (-$0.55)** |
 | Jul 08, 2026 | **Oklahoma City Low** ([NOAA Link](https://forecast.weather.gov/data/obhistory/KOKC.html) • [Kalshi Link](https://kalshi.com/markets/kxlowtokc/a/kxlowtokc-26jul08))<br>`KXLOWTOKC-26JUL08-B70.5` | **Buy NO** 70-71° @ 72¢<br>⚠️ *Correlated NO (Scaled 1/5)* | 5 | $3.60 + $0.02 fee<br>**($3.62 total)** | 99.0% | +54.7% | $5.00 | ✅ **Won (+$1.38)** |

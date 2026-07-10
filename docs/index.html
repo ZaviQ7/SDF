@@ -4,56 +4,240 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="300">
+
     <title>Kalshi Weather Plays</title>
+
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 18px;
-            line-height: 1.5;
-            background: #f5f5f5;
+            margin: 0;
+            padding: 16px;
+            background: #f3f5f7;
+            color: #17202a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                         Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.45;
         }
+
         main {
-            background: white;
-            padding: 18px;
-            border-radius: 12px;
+            width: min(1100px, 100%);
+            margin: 0 auto;
         }
-        pre {
-            white-space: pre-wrap;
+
+        .notice {
+            margin-bottom: 16px;
+            padding: 14px 16px;
+            border: 1px solid #b8d4ff;
+            border-radius: 12px;
+            background: #eaf3ff;
+        }
+
+        .notice strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .card {
+            padding: 18px;
+            border-radius: 14px;
+            background: white;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.65rem;
+        }
+
+        h2 {
+            margin-top: 28px;
+            padding-bottom: 7px;
+            border-bottom: 1px solid #dfe4ea;
+            font-size: 1.25rem;
+        }
+
+        blockquote {
+            margin: 16px 0;
+            padding: 10px 14px;
+            border-left: 4px solid #8ca9c7;
+            background: #f6f8fa;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 20px;
+            font-size: 0.92rem;
+        }
+
+        th,
+        td {
+            padding: 10px 9px;
+            border: 1px solid #d9dee4;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #edf1f5;
+            font-weight: 650;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f8fafb;
+        }
+
+        code {
+            padding: 2px 5px;
+            border-radius: 5px;
+            background: #edf1f5;
             overflow-wrap: anywhere;
-            font-family: Arial, sans-serif;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 9px;
+            }
+
+            .card {
+                padding: 13px;
+            }
+
+            h1 {
+                font-size: 1.35rem;
+            }
+
+            table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+                font-size: 0.82rem;
+            }
+
+            th,
+            td {
+                padding: 8px 7px;
+            }
         }
     </style>
 </head>
+
 <body>
 <main>
-<pre># Kalshi Weather Lab — Paper Portfolio
+    <div class="notice">
+        <strong>Shadow mode is active.</strong>
+        “Recent Decisions” are the bets the model proposed.
+        “Positions” remains empty because simulated execution is currently disabled.
+    </div>
 
-Generated: 2026-07-10T05:46:29.516303+00:00
-
-- **Starting bankroll:** $15.00
-- **Cash:** $15.00
-- **Open cost basis (not NAV):** $0.00
-- **Realized P/L:** +0.00
-
-&gt; This report intentionally does not call cost basis ‘NAV’. Liquidation NAV requires current executable bids and exit fees.
-
-## Positions
-
-| Ticker | Side | Qty | Cost | Status | Result | Credit |
-|---|---:|---:|---:|---:|---:|---:|
-| — | — | — | — | — | — | — |
-
-## Recent Decisions
-
-| Time | Ticker | Side | Conservative p | Price | EV | Accepted | Reason |
-|---|---|---:|---:|---:|---:|---:|---|
-| 2026-07-10T04:35:41.482626+00:00 | `KXLOWTBOS-26JUL10-T70` | NO | 17.8% | $0.0900 | +0.0817 | yes | selected by event expected-log optimizer |
-| 2026-07-10T04:35:38.616559+00:00 | `KXLOWTPHIL-26JUL10-B70.5` | YES | 10.6% | $0.0200 | +0.0846 | yes | selected by event expected-log optimizer |
-| 2026-07-10T04:35:38.579110+00:00 | `KXLOWTPHIL-26JUL10-T73` | NO | 66.7% | $0.5400 | +0.1099 | yes | selected by event expected-log optimizer |
-| 2026-07-10T04:23:49.935966+00:00 | `KXHIGHTATL-26JUL10-B93.5` | NO | 52.8% | $0.4500 | +0.0604 | yes | selected by event expected-log optimizer |
-</pre>
+    <div class="card">
+        <h1>Kalshi Weather Lab — Shadow Recommendations</h1>
+<p>Generated: 2026-07-10T05:53:04.263481+00:00</p>
+<ul>
+<li><strong>Starting bankroll:</strong> $15.00</li>
+<li><strong>Cash:</strong> $15.00</li>
+<li><strong>Open cost basis (not NAV):</strong> $0.00</li>
+<li><strong>Realized P/L:</strong> +0.00</li>
+</ul>
+<blockquote>
+<p>This report intentionally does not call cost basis ‘NAV’. Liquidation NAV requires current executable bids and exit fees.</p>
+</blockquote>
+<h2>Positions</h2>
+<table>
+<thead>
+<tr>
+<th>Ticker</th>
+<th style="text-align: right;">Side</th>
+<th style="text-align: right;">Qty</th>
+<th style="text-align: right;">Cost</th>
+<th style="text-align: right;">Status</th>
+<th style="text-align: right;">Result</th>
+<th style="text-align: right;">Credit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">—</td>
+</tr>
+</tbody>
+</table>
+<h2>Recent Decisions</h2>
+<table>
+<thead>
+<tr>
+<th>Time</th>
+<th>Ticker</th>
+<th style="text-align: right;">Side</th>
+<th style="text-align: right;">Conservative p</th>
+<th style="text-align: right;">Price</th>
+<th style="text-align: right;">EV</th>
+<th style="text-align: right;">Accepted</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-07-10T05:49:16.921877+00:00</td>
+<td><code>KXLOWTBOS-26JUL10-T70</code></td>
+<td style="text-align: right;">NO</td>
+<td style="text-align: right;">17.0%</td>
+<td style="text-align: right;">$0.0800</td>
+<td style="text-align: right;">+0.0848</td>
+<td style="text-align: right;">yes</td>
+<td>selected by event expected-log optimizer</td>
+</tr>
+<tr>
+<td>2026-07-10T04:35:41.482626+00:00</td>
+<td><code>KXLOWTBOS-26JUL10-T70</code></td>
+<td style="text-align: right;">NO</td>
+<td style="text-align: right;">17.8%</td>
+<td style="text-align: right;">$0.0900</td>
+<td style="text-align: right;">+0.0817</td>
+<td style="text-align: right;">yes</td>
+<td>selected by event expected-log optimizer</td>
+</tr>
+<tr>
+<td>2026-07-10T04:35:38.616559+00:00</td>
+<td><code>KXLOWTPHIL-26JUL10-B70.5</code></td>
+<td style="text-align: right;">YES</td>
+<td style="text-align: right;">10.6%</td>
+<td style="text-align: right;">$0.0200</td>
+<td style="text-align: right;">+0.0846</td>
+<td style="text-align: right;">yes</td>
+<td>selected by event expected-log optimizer</td>
+</tr>
+<tr>
+<td>2026-07-10T04:35:38.579110+00:00</td>
+<td><code>KXLOWTPHIL-26JUL10-T73</code></td>
+<td style="text-align: right;">NO</td>
+<td style="text-align: right;">66.7%</td>
+<td style="text-align: right;">$0.5400</td>
+<td style="text-align: right;">+0.1099</td>
+<td style="text-align: right;">yes</td>
+<td>selected by event expected-log optimizer</td>
+</tr>
+<tr>
+<td>2026-07-10T04:23:49.935966+00:00</td>
+<td><code>KXHIGHTATL-26JUL10-B93.5</code></td>
+<td style="text-align: right;">NO</td>
+<td style="text-align: right;">52.8%</td>
+<td style="text-align: right;">$0.4500</td>
+<td style="text-align: right;">+0.0604</td>
+<td style="text-align: right;">yes</td>
+<td>selected by event expected-log optimizer</td>
+</tr>
+</tbody>
+</table>
+    </div>
 </main>
 </body>
 </html>

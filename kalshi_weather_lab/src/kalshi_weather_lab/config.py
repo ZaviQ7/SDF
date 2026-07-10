@@ -18,6 +18,7 @@ class RiskConfig:
     max_positions_per_event: int = 3
     min_dollar_ev: float = 0.03
     min_return_on_cost: float = 0.08
+    min_side_probability: float = 0.10
     calibration_error_floor: float = 0.035
     confidence_z: float = 1.0
 

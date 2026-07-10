@@ -59,6 +59,7 @@ def run_demo(bankroll: Decimal = Decimal("15.00")) -> dict:
         taker_multiplier=1.0,
         min_dollar_ev=0.01,
         min_return_on_cost=0.03,
+	min_side_probability=0.10,
     )
     plan = optimize_event(
         "DEMO-WEATHER",

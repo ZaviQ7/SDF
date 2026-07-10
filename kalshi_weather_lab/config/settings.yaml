@@ -19,7 +19,7 @@ risk:
   min_return_on_cost: 0.08
   calibration_error_floor: 0.035
   confidence_z: 1.0
-
+  min_side_probability: 0.10
 scan_windows:
   # City-local hours. The systemd timer can call run-once frequently; gates prevent stale scans.
   low_start_hour: 1

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from collections.abc import Sequence
+from decimal import Decimal
 
 from .domain import CandidateTrade, Market, ProbabilityEstimate, Side
 from .optimizer import candidate_from_quote
@@ -17,17 +17,27 @@ def build_candidates(
     taker_multiplier: float,
     min_dollar_ev: float,
     min_return_on_cost: float,
+    min_side_probability: float,
 ) -> tuple[CandidateTrade, ...]:
     estimate_map = {estimate.ticker: estimate for estimate in estimates}
     candidates: list[CandidateTrade] = []
+
     for market in markets:
         estimate = estimate_map[market.ticker]
+
         for side in (Side.YES, Side.NO):
             probability = (
                 estimate.conservative_yes
                 if side is Side.YES
-                else max(0.0, 1.0 - estimate.raw_yes - estimate.uncertainty_penalty)
+                else max(
+                    0.0,
+                    1.0 - estimate.raw_yes - estimate.uncertainty_penalty,
+                )
             )
+
+            if probability < min_side_probability:
+                continue
+
             try:
                 quote = quote_taker_buy(
                     books[market.ticker],
@@ -38,10 +48,26 @@ def build_candidates(
                 )
             except (KeyError, InsufficientDepthError):
                 continue
-            candidate = candidate_from_quote(market, side, probability, quote)
+
+            candidate = candidate_from_quote(
+                market,
+                side,
+                probability,
+                quote,
+            )
+
             if candidate.dollar_ev < Decimal(str(min_dollar_ev)):
                 continue
+
             if candidate.return_on_cost < min_return_on_cost:
                 continue
+
             candidates.append(candidate)
-    return tuple(sorted(candidates, key=lambda c: c.dollar_ev, reverse=True))
+
+    return tuple(
+        sorted(
+            candidates,
+            key=lambda candidate: candidate.dollar_ev,
+            reverse=True,
+        )
+    )

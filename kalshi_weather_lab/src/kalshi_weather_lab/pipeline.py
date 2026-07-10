@@ -111,6 +111,7 @@ class Scanner:
             taker_multiplier=self.config.fees.taker_multiplier,
             min_dollar_ev=self.config.risk.min_dollar_ev,
             min_return_on_cost=self.config.risk.min_return_on_cost,
+	    min_side_probability=self.config.risk.min_side_probability,
         )
         open_positions = self.ledger.open_positions()
         open_tickers = {position["ticker"] for position in open_positions}

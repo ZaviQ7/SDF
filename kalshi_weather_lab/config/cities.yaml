@@ -1,0 +1,140 @@
+cities:
+  - active: true
+    code: PHIL
+    name: Philadelphia
+    lat: 39.8722
+    lon: -75.2408
+    timezone: America/New_York
+    nws_station_id: KPHL
+    kalshi_market_prefix: KXHIGHPHIL
+    kalshi_market_prefix_low: KXLOWTPHIL
+
+  - active: true
+    code: CHI
+    name: Chicago
+    lat: 41.9742
+    lon: -87.9073
+    timezone: America/Chicago
+    nws_station_id: KORD
+    kalshi_market_prefix: KXHIGHCHI
+    kalshi_market_prefix_low: KXLOWTCHI
+
+  - active: true
+    code: DEN
+    name: Denver
+    lat: 39.8561
+    lon: -104.6737
+    timezone: America/Denver
+    nws_station_id: KDEN
+    kalshi_market_prefix: KXHIGHDEN
+    kalshi_market_prefix_low: KXLOWDEN
+
+  - active: true
+    code: AUS
+    name: Austin
+    lat: 30.1944
+    lon: -97.67
+    timezone: America/Chicago
+    nws_station_id: KAUS
+    kalshi_market_prefix: KXHIGHAUS
+    kalshi_market_prefix_low: KXLOWTAUS
+
+  - active: true
+    code: MIA
+    name: Miami
+    lat: 25.7959
+    lon: -80.287
+    timezone: America/New_York
+    nws_station_id: KMIA
+    kalshi_market_prefix: KXHIGHMIA
+    kalshi_market_prefix_low: KXLOWTMIA
+
+  - active: true
+    code: NOLA
+    name: New Orleans
+    lat: 29.9911
+    lon: -90.2589
+    timezone: America/Chicago
+    nws_station_id: KMSY
+    kalshi_market_prefix: KXHIGHNOLA
+    kalshi_market_prefix_low: KXLOWTNOLA
+
+  - active: true
+    code: BOS
+    name: Boston
+    lat: 42.3643
+    lon: -71.0051
+    timezone: America/New_York
+    nws_station_id: KBOS
+    kalshi_market_prefix: KXHIGHBOS
+    kalshi_market_prefix_low: KXLOWTBOS
+
+  - active: true
+    code: NY
+    name: New York
+    lat: 40.7829
+    lon: -73.9654
+    timezone: America/New_York
+    nws_station_id: KNYC
+    kalshi_market_prefix: KXHIGHNY
+    kalshi_market_prefix_low: KXLOWTNYC
+
+  - active: true
+    code: HOU
+    name: Houston
+    lat: 29.6454
+    lon: -95.2789
+    timezone: America/Chicago
+    nws_station_id: KHOU
+    kalshi_market_prefix: KXHIGHTHOU
+    kalshi_market_prefix_low: KXLOWTHOU
+
+  - active: true
+    code: PHX
+    name: Phoenix
+    lat: 33.4373
+    lon: -112.0078
+    timezone: America/Phoenix
+    nws_station_id: KPHX
+    kalshi_market_prefix: KXHIGHTPHX
+    kalshi_market_prefix_low: KXLOWTPHX
+
+  - active: true
+    code: ATL
+    name: Atlanta
+    lat: 33.6407
+    lon: -84.4277
+    timezone: America/New_York
+    nws_station_id: KATL
+    kalshi_market_prefix: KXHIGHTATL
+    kalshi_market_prefix_low: KXLOWTATL
+
+  - active: true
+    code: OKC
+    name: Oklahoma City
+    lat: 35.3931
+    lon: -97.6008
+    timezone: America/Chicago
+    nws_station_id: KOKC
+    kalshi_market_prefix: KXHIGHTOKC
+    kalshi_market_prefix_low: KXLOWTOKC
+
+  - active: true
+    code: SEA
+    name: Seattle
+    lat: 47.4502
+    lon: -122.3088
+    timezone: America/Los_Angeles
+    nws_station_id: KSEA
+    kalshi_market_prefix: KXHIGHTSEA
+    kalshi_market_prefix_low: KXLOWTSEA
+
+  - active: true
+    code: SFO
+    name: San Francisco
+    lat: 37.6213
+    lon: -122.3790
+    timezone: America/Los_Angeles
+    nws_station_id: KSFO
+    kalshi_market_prefix: KXHIGHTSFO
+    kalshi_market_prefix_low: KXLOWTSFO

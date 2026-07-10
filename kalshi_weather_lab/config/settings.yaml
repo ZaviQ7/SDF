@@ -1,0 +1,36 @@
+paths:
+  database: data/kalshi_weather.sqlite3
+  report: reports/dashboard.md
+
+kalshi:
+  api_base_url: https://external-api.kalshi.com/trade-api/v2
+
+weather:
+  timeout_seconds: 25
+
+risk:
+  starting_bankroll: 15.00
+  # With a tiny bankroll, indivisible contracts dominate sizing. A rejected size stays zero.
+  max_event_loss_fraction: 0.05
+  max_daily_loss_fraction: 0.10
+  max_contracts_per_market: 1
+  max_positions_per_event: 3
+  min_dollar_ev: 0.03
+  min_return_on_cost: 0.08
+  calibration_error_floor: 0.035
+  confidence_z: 1.0
+
+scan_windows:
+  # City-local hours. The systemd timer can call run-once frequently; gates prevent stale scans.
+  low_start_hour: 1
+  low_end_hour: 3
+  high_start_hour: 11
+  high_end_hour: 15
+
+fees:
+  # Effective July 7, 2026 general schedule. Recheck before live use.
+  taker_rate: 0.07
+  maker_rate: 0.0175
+  taker_multiplier: 1.0
+  # General maker multiplier is zero unless a series is explicitly listed otherwise.
+  maker_multiplier: 0.0

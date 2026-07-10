@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Kalshi Weather Lab every 30 minutes; city-local gates decide what to scan
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Kalshi Weather Lab dry-run scan and settlement cycle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/pi/SDF/kalshi_weather_lab
+ExecStart=/bin/bash -lc '/home/pi/SDF/kalshi_weather_lab/.venv/bin/kalshi-weather settle-open && /home/pi/SDF/kalshi_weather_lab/.venv/bin/kalshi-weather run-once'
+User=pi

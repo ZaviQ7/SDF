@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+from datetime import date
+
+from .config import AppConfig
+from .contracts import parse_contract_rule
+from .domain import Side, TemperatureType
+from .kalshi_client import KalshiPublicClient
+from .ledger import Ledger
+from .nws import NWSClient
+
+
+async def settle_event_from_final_cli(
+    ledger: Ledger,
+    *,
+    station_id: str,
+    target_date: date,
+    temp_type: TemperatureType,
+    ticker_titles: dict[str, str],
+) -> dict:
+    """Final-report-only settlement. No preliminary observation fallback is allowed."""
+    actual = await NWSClient().final_cli_temperature(station_id, target_date, temp_type)
+    if actual is None:
+        return {"settled": 0, "actual": None, "reason": "final NWS CLI report not yet available"}
+    rounded = int(round(actual))
+    count = 0
+    for position in ledger.open_positions():
+        ticker = position["ticker"]
+        if ticker not in ticker_titles:
+            continue
+        rule = parse_contract_rule(ticker_titles[ticker])
+        official_yes = rule.contains(rounded)
+        changed = ledger.settle_position(
+            ticker,
+            Side(position["side"]),
+            official_yes,
+            source=f"NWS final CLI {station_id} {target_date.isoformat()} ({actual:.0f}F)",
+        )
+        count += int(changed)
+    return {"settled": count, "actual": actual, "reason": "ok"}
+
+
+async def settle_all_open(config: AppConfig, ledger: Ledger) -> list[dict]:
+    positions = ledger.open_positions_with_metadata()
+    if not positions:
+        return []
+    cities = {city.code: city for city in config.cities}
+    nws = NWSClient(config.open_meteo_timeout_seconds)
+    actual_cache: dict[tuple, float | None] = {}
+    results: list[dict] = []
+    async with KalshiPublicClient(config.api_base_url) as kalshi:
+        for position in positions:
+            city = cities.get(position.get("city_code"))
+            target_raw = position.get("target_date")
+            temp_raw = position.get("temp_type")
+            if city is None or not target_raw or not temp_raw:
+                results.append({"ticker": position["ticker"], "settled": False, "reason": "missing decision metadata"})
+                continue
+            target = date.fromisoformat(target_raw)
+            temp_type = TemperatureType(temp_raw)
+            cache_key = (city.station_id, target, temp_type)
+            if cache_key not in actual_cache:
+                actual_cache[cache_key] = await nws.final_cli_temperature(city.station_id, target, temp_type)
+            actual = actual_cache[cache_key]
+            if actual is None:
+                results.append({"ticker": position["ticker"], "settled": False, "reason": "final NWS CLI unavailable"})
+                continue
+            market = await kalshi.get_market(position["ticker"])
+            title = market.get("subtitle") or market.get("title") or market.get("yes_sub_title") or ""
+            official_yes = parse_contract_rule(title).contains(int(round(actual)))
+            changed = ledger.settle_position(
+                position["ticker"],
+                Side(position["side"]),
+                official_yes,
+                source=f"NWS final CLI {city.station_id} {target.isoformat()} ({actual:.0f}F)",
+            )
+            results.append({"ticker": position["ticker"], "settled": changed, "actual": actual})
+    return results

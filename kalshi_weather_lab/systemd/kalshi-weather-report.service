@@ -1,0 +1,10 @@
+[Unit]
+Description=Regenerate Kalshi Weather Lab paper dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/pi/SDF/kalshi_weather_lab
+ExecStart=/home/pi/SDF/kalshi_weather_lab/.venv/bin/kalshi-weather report
+User=pi

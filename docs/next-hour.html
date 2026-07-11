@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="300">
+<title>KLAX Next-Hour Forecast</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 12px;
+    background: #f3f5f7;
+    color: #17202a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, Arial, sans-serif;
+}
+
+main {
+    width: min(1100px, 100%);
+    margin: auto;
+}
+
+.card {
+    margin-bottom: 14px;
+    padding: 17px;
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.07);
+}
+
+h1 {
+    margin: 0 0 7px;
+    font-size: 1.55rem;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.muted {
+    color: #65717d;
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+}
+
+.metric {
+    padding: 12px;
+    background: #f8fafb;
+    border: 1px solid #dce2e8;
+    border-radius: 10px;
+}
+
+.label {
+    color: #65717d;
+    font-size: .82rem;
+}
+
+.value {
+    margin-top: 4px;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.scroll {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 9px;
+    border: 1px solid #dce2e8;
+    text-align: left;
+    white-space: nowrap;
+}
+
+th {
+    background: #edf1f5;
+}
+
+.bar {
+    width: 160px;
+    height: 9px;
+    background: #e4e9ee;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.fill {
+    height: 100%;
+    background: #3478b8;
+}
+
+.correct {
+    color: #14733c;
+    font-weight: 700;
+}
+
+.miss {
+    color: #b3261e;
+    font-weight: 700;
+}
+
+.pending {
+    color: #806800;
+    font-weight: 700;
+}
+
+@media (max-width: 700px) {
+    .metrics {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+
+    table {
+        font-size: .82rem;
+    }
+}
+</style>
+</head>
+
+<body>
+<main>
+<section class="card">
+    <h1>KLAX Next-Hour Temperature Model</h1>
+    <div class="muted">
+        Updated Jul 11, 2026 12:41:56 AM EDT
+    </div>
+</section>
+
+<section class="card">
+    <h2>Latest forecast</h2>
+
+    <p>
+        Source METAR:
+        <strong>Jul 10, 11:53 PM EDT</strong>
+        <br>
+        Target hour:
+        <strong>Jul 11, 12:00 AM EDT</strong>
+    </p>
+
+    <div class="metrics">
+        <div class="metric">
+            <div class="label">Point forecast</div>
+            <div class="value">
+                66.14°F
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Most likely result</div>
+            <div class="value">66°F</div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Top probability</div>
+            <div class="value">41.7%</div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Confidence</div>
+            <div class="value">Low</div>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Rounded temperature probabilities</h2>
+
+    <div class="scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Temperature</th>
+                    <th>Probability</th>
+                    <th>Distribution</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td>63°F</td>
+            <td>0.2%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:0.2%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+        <tr>
+            <td>64°F</td>
+            <td>3.2%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:3.2%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+        <tr>
+            <td>65°F</td>
+            <td>20.4%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:20.4%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+        <tr>
+            <td>66°F</td>
+            <td>41.7%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:41.7%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+        <tr>
+            <td>67°F</td>
+            <td>28.0%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:28.0%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+        <tr>
+            <td>68°F</td>
+            <td>6.1%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:6.1%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+        <tr>
+            <td>69°F</td>
+            <td>0.4%</td>
+            <td>
+                <div class="bar">
+                    <div class="fill"
+                         style="width:0.4%">
+                    </div>
+                </div>
+            </td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Threshold fair values</h2>
+
+    <div class="scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Contract outcome</th>
+                    <th>Model probability</th>
+                    <th>Fair value</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td>62°F or above</td>
+            <td>100.0%</td>
+            <td>100.0¢</td>
+        </tr>
+        
+        <tr>
+            <td>63°F or above</td>
+            <td>100.0%</td>
+            <td>100.0¢</td>
+        </tr>
+        
+        <tr>
+            <td>64°F or above</td>
+            <td>99.8%</td>
+            <td>99.8¢</td>
+        </tr>
+        
+        <tr>
+            <td>65°F or above</td>
+            <td>96.6%</td>
+            <td>96.6¢</td>
+        </tr>
+        
+        <tr>
+            <td>66°F or above</td>
+            <td>76.2%</td>
+            <td>76.2¢</td>
+        </tr>
+        
+        <tr>
+            <td>67°F or above</td>
+            <td>34.5%</td>
+            <td>34.5¢</td>
+        </tr>
+        
+        <tr>
+            <td>68°F or above</td>
+            <td>6.6%</td>
+            <td>6.6¢</td>
+        </tr>
+        
+        <tr>
+            <td>69°F or above</td>
+            <td>0.4%</td>
+            <td>0.4¢</td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Performance</h2>
+
+    <div class="metrics">
+        <div class="metric">
+            <div class="label">Completed forecasts</div>
+            <div class="value">0</div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Mean absolute error</div>
+            <div class="value">
+                —
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">RMSE</div>
+            <div class="value">
+                —
+            </div>
+        </div>
+
+        <div class="metric">
+            <div class="label">Rounded accuracy</div>
+            <div class="value">
+                —
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Forecast history</h2>
+
+    <div class="scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Target hour</th>
+                    <th>Point forecast</th>
+                    <th>Top result</th>
+                    <th>Confidence</th>
+                    <th>Actual</th>
+                    <th>Error</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td>Jul 11, 12:00 AM EDT</td>
+            <td>66.14°F</td>
+            <td>66°F</td>
+            <td>41.7%</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="pending">Pending</td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+</section>
+</main>
+</body>
+</html>

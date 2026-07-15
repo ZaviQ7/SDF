@@ -17,3 +17,11 @@ kalshi_weather_lab/.pytest_cache/
 kalshi_weather_lab/**/__pycache__/
 kalshi_weather_lab.zip
 kalshi_weather_lab/src/*.egg-info/
+
+# Local backups and runtime data
+kalshi_weather_lab/backups/
+kalshi_weather_lab/**/*_before_*.py
+kalshi_weather_lab/scripts/publish_dashboard_before_*.sh
+*.sqlite3
+*.sqlite3-*
+*.tar.gz

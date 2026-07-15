@@ -18,6 +18,7 @@ def build_candidates(
     min_dollar_ev: float,
     min_return_on_cost: float,
     min_side_probability: float,
+    min_contract_price: float,
 ) -> tuple[CandidateTrade, ...]:
     estimate_map = {estimate.ticker: estimate for estimate in estimates}
     candidates: list[CandidateTrade] = []
@@ -47,6 +48,9 @@ def build_candidates(
                     taker_multiplier=taker_multiplier,
                 )
             except (KeyError, InsufficientDepthError):
+                continue
+
+            if quote.average_price < Decimal(str(min_contract_price)):
                 continue
 
             candidate = candidate_from_quote(

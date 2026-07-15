@@ -88,6 +88,29 @@ CREATE TABLE IF NOT EXISTS settlements (
     UNIQUE(ticker, side)
 );
 
+CREATE TABLE IF NOT EXISTS forecast_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    city_code TEXT NOT NULL,
+    temp_type TEXT NOT NULL,
+    model TEXT NOT NULL,
+    lead_bucket TEXT NOT NULL,
+    target_date TEXT NOT NULL,
+    forecast_f REAL NOT NULL,
+    deterministic INTEGER NOT NULL,
+    captured_at TEXT NOT NULL,
+    residual_recorded INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(
+        city_code,
+        temp_type,
+        model,
+        lead_bucket,
+        target_date
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_forecast_snapshots_target
+ON forecast_snapshots(city_code, temp_type, target_date, residual_recorded);
+
 CREATE TABLE IF NOT EXISTS forecast_residuals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     city_code TEXT NOT NULL,
@@ -353,6 +376,109 @@ class Ledger:
                 "SELECT * FROM decisions ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def record_forecast_snapshot(
+        self,
+        *,
+        city_code: str,
+        temp_type: str,
+        model: str,
+        lead_bucket: str,
+        target_date: str,
+        forecast_f: float,
+        deterministic: bool,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """INSERT INTO forecast_snapshots
+                   (city_code, temp_type, model, lead_bucket, target_date,
+                    forecast_f, deterministic, captured_at, residual_recorded)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                   ON CONFLICT(
+                       city_code,
+                       temp_type,
+                       model,
+                       lead_bucket,
+                       target_date
+                   )
+                   DO UPDATE SET
+                       forecast_f=excluded.forecast_f,
+                       deterministic=excluded.deterministic,
+                       captured_at=excluded.captured_at
+                   WHERE forecast_snapshots.residual_recorded=0""",
+                (
+                    city_code,
+                    temp_type,
+                    model.lower(),
+                    lead_bucket,
+                    target_date,
+                    float(forecast_f),
+                    int(deterministic),
+                    _now(),
+                ),
+            )
+
+    def unresolved_forecast_snapshots(
+        self,
+        *,
+        city_code: str,
+        temp_type: str,
+        target_date: str,
+    ) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT *
+                   FROM forecast_snapshots
+                   WHERE city_code=?
+                     AND temp_type=?
+                     AND target_date=?
+                     AND residual_recorded=0
+                   ORDER BY captured_at""",
+                (city_code, temp_type, target_date),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def finalize_forecast_snapshot(
+        self,
+        *,
+        snapshot_id: int,
+        actual_f: float,
+    ) -> None:
+        with self.transaction() as conn:
+            row = conn.execute(
+                """SELECT *
+                   FROM forecast_snapshots
+                   WHERE id=? AND residual_recorded=0""",
+                (snapshot_id,),
+            ).fetchone()
+
+            if row is None:
+                return
+
+            conn.execute(
+                """INSERT OR REPLACE INTO forecast_residuals
+                   (city_code, temp_type, model, lead_bucket, target_date,
+                    forecast_f, actual_f, residual_f, recorded_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    row["city_code"],
+                    row["temp_type"],
+                    row["model"],
+                    row["lead_bucket"],
+                    row["target_date"],
+                    float(row["forecast_f"]),
+                    float(actual_f),
+                    float(actual_f) - float(row["forecast_f"]),
+                    _now(),
+                ),
+            )
+
+            conn.execute(
+                """UPDATE forecast_snapshots
+                   SET residual_recorded=1
+                   WHERE id=?""",
+                (snapshot_id,),
+            )
 
     def residual_rows(self) -> list[dict]:
         with self.connect() as conn:

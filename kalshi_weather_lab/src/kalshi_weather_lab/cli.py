@@ -44,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_once = sub.add_parser("run-once", help="Scan all active city events whose local scan window is open")
     run_once.add_argument("--paper-execute", action="store_true")
 
-    sub.add_parser("settle-open", help="Settle open paper positions only from final NWS CLI reports")
+    sub.add_parser("settle-open", help="Settle open positions and all eligible forecast snapshots from final NWS CLI reports")
     sub.add_parser("report", help="Regenerate the Markdown dashboard from SQLite")
 
     migrate = sub.add_parser("audit-legacy", help="Detect duplicate rows in the old Markdown ledger")

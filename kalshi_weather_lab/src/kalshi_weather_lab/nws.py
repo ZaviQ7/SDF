@@ -56,6 +56,11 @@ class NWSClient:
             text = product.get("productText", "")
             if not pattern.search(text):
                 continue
+
+            # Same-day afternoon CLI products are preliminary and may say
+            # "VALID TODAY AS OF 0400 PM". They must not settle markets.
+            if re.search(r"VALID\s+TODAY\s+AS\s+OF", text, re.I):
+                continue
             match = value_pattern.search(text)
             if match:
                 return float(match.group(1))

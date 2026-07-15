@@ -4,6 +4,7 @@ import logging
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
+from statistics import median
 
 from .arbitrage import find_strip_arbitrage
 from .calibration import ResidualCalibrator, load_residual_rows
@@ -53,6 +54,29 @@ class Scanner:
         )
         if not bundle.forecasts:
             raise RuntimeError("No weather forecasts were retrieved")
+
+        lead_bucket = ResidualCalibrator.lead_bucket(
+            bundle.hours_to_target
+        )
+
+        for forecast in bundle.forecasts:
+            if not forecast.values:
+                continue
+
+            # Store one representative value per model/date/lead bucket.
+            # Ensemble members are correlated and must not each count as
+            # independent calibration samples.
+            representative_value = float(median(forecast.values))
+
+            self.ledger.record_forecast_snapshot(
+                city_code=city.code,
+                temp_type=temp_type.value,
+                model=forecast.model,
+                lead_bucket=lead_bucket,
+                target_date=target_date.isoformat(),
+                forecast_f=representative_value,
+                deterministic=forecast.deterministic,
+            )
 
         async with KalshiPublicClient(self.config.api_base_url) as kalshi:
             payloads = await kalshi.list_markets(series_ticker=series, status="open")
@@ -112,6 +136,7 @@ class Scanner:
             min_dollar_ev=self.config.risk.min_dollar_ev,
             min_return_on_cost=self.config.risk.min_return_on_cost,
 	    min_side_probability=self.config.risk.min_side_probability,
+                min_contract_price=self.config.risk.min_contract_price,
         )
         open_positions = self.ledger.open_positions()
         open_tickers = {position["ticker"] for position in open_positions}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import erf, sqrt
+from math import erf, floor, sqrt
 from collections.abc import Sequence
 
 from .calibration import ResidualCalibrator, conservative_probability
@@ -23,8 +23,21 @@ def rule_probability_normal(rule: ContractRule, mean: float, sigma: float) -> fl
 def default_model_weights(hours_to_target: float, models: set[str]) -> dict[str, float]:
     base = {"ecmwf": 0.40, "gfs": 0.35, "icon": 0.15, "gem": 0.10}
     hrrr_weight = 0.0
-    if "hrrr" in models and hours_to_target > 0:
-        if hours_to_target <= 12:
+    if "hrrr" in models:
+        # Once the expected daily peak has arrived or passed, the observed
+        # station extreme and short-range HRRR guidance should dominate.
+        # Global ensembles can otherwise preserve an unrealistic warm tail.
+        if hours_to_target <= 0:
+            # After the expected peak, global ensemble members can retain
+            # stale warm tails from earlier runs. Use nearly all weight on
+            # short-range guidance, which has already been conditioned on
+            # the observed station extreme.
+            hrrr_weight = 0.95
+        elif hours_to_target <= 3:
+            hrrr_weight = 0.65
+        elif hours_to_target <= 6:
+            hrrr_weight = 0.55
+        elif hours_to_target <= 12:
             hrrr_weight = 0.45
         elif hours_to_target <= 24:
             hrrr_weight = 0.30
@@ -77,13 +90,48 @@ def event_probabilities(
             bundle.temp_type.value,
             model,
             bundle.hours_to_target,
-            fallback_sigma=_fallback_sigma(model, bundle.hours_to_target, forecast.deterministic),
+            fallback_sigma=_fallback_sigma(
+                model,
+                bundle.hours_to_target,
+                forecast.deterministic,
+            ),
         )
+
+        sigma = error.sigma
+
+        # For same-day nowcasts, forecast values have already been rebuilt
+        # from the observed station extreme plus only the remaining hours.
+        # Once the expected peak is near or past, the ordinary full-day
+        # residual spread is too wide and creates unrealistic warm/cold tails.
+        if bundle.observed_extreme is not None:
+            if bundle.hours_to_target <= 0:
+                sigma = min(
+                    sigma,
+                    0.75 if model == "hrrr" else 1.00,
+                )
+            elif bundle.hours_to_target <= 3:
+                sigma = min(
+                    sigma,
+                    1.00 if model == "hrrr" else 1.25,
+                )
+            elif bundle.hours_to_target <= 6:
+                sigma = min(
+                    sigma,
+                    1.20 if model == "hrrr" else 1.50,
+                )
+
         member_weight = model_weight / len(forecast.values)
         for value in forecast.values:
             corrected_mean = value + error.bias
             for idx, rule in enumerate(rules):
-                probabilities[idx] += member_weight * rule_probability_normal(rule, corrected_mean, error.sigma)
+                probabilities[idx] += (
+                    member_weight
+                    * rule_probability_normal(
+                        rule,
+                        corrected_mean,
+                        sigma,
+                    )
+                )
         # Kish-like effective sample size; model correlation prevents treating all members as independent.
         model_effective_members = 1.0 if forecast.deterministic else min(10.0, sqrt(len(forecast.values)))
         effective_n_inverse += (model_weight * model_weight) / model_effective_members
@@ -93,7 +141,10 @@ def event_probabilities(
 
     # Apply hard same-day physical constraints from observed station extrema.
     if bundle.observed_extreme is not None:
-        observed_rounded = int(round(bundle.observed_extreme))
+        # NWS/Kalshi integer-temperature bins use half-degree boundaries.
+        # Do not use Python round(), which applies banker's rounding:
+        # round(82.5) == 82. Half degrees must move to the next integer.
+        observed_rounded = int(floor(bundle.observed_extreme + 0.5))
         for idx, rule in enumerate(rules):
             if bundle.temp_type is TemperatureType.HIGH:
                 # Final high cannot land below the high already observed.

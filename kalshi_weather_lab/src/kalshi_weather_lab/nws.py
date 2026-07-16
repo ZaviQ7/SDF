@@ -66,6 +66,85 @@ class NWSClient:
                 return float(match.group(1))
         return None
 
+    @staticmethod
+    def _tenths_c_to_f(sign: str, digits: str) -> float:
+        value_c = int(digits) / 10.0
+        if sign == "1":
+            value_c = -value_c
+        return value_c * 9.0 / 5.0 + 32.0
+
+    @classmethod
+    def _raw_metar_temperatures(
+        cls,
+        raw_message: str,
+        temp_type: TemperatureType,
+        *,
+        include_six_hour: bool = True,
+        include_twenty_four_hour: bool = True,
+    ) -> list[float]:
+        """Extract instantaneous and reported period extrema from METAR remarks.
+
+        Supported groups:
+        TsnTTT             precise instantaneous temperature
+        1snTTT             six-hour maximum
+        2snTTT             six-hour minimum
+        4snTTTsnTTT        24-hour maximum and minimum
+        """
+        values: list[float] = []
+
+        precise = re.search(
+            r"(?<!\S)T([01])(\d{3})[01]\d{3}(?=\s|$)",
+            raw_message,
+        )
+        if precise:
+            values.append(cls._tenths_c_to_f(precise.group(1), precise.group(2)))
+
+        six_hour = None
+        if include_six_hour:
+            if temp_type is TemperatureType.HIGH:
+                six_hour = re.search(
+                    r"(?<!\S)1([01])(\d{3})(?=\s|$)",
+                    raw_message,
+                )
+            else:
+                six_hour = re.search(
+                    r"(?<!\S)2([01])(\d{3})(?=\s|$)",
+                    raw_message,
+                )
+
+        if six_hour:
+            values.append(
+                cls._tenths_c_to_f(
+                    six_hour.group(1),
+                    six_hour.group(2),
+                )
+            )
+
+        twenty_four_hour = None
+        if include_twenty_four_hour:
+            twenty_four_hour = re.search(
+                r"(?<!\S)4([01])(\d{3})([01])(\d{3})(?=\s|$)",
+                raw_message,
+            )
+
+        if twenty_four_hour:
+            if temp_type is TemperatureType.HIGH:
+                values.append(
+                    cls._tenths_c_to_f(
+                        twenty_four_hour.group(1),
+                        twenty_four_hour.group(2),
+                    )
+                )
+            else:
+                values.append(
+                    cls._tenths_c_to_f(
+                        twenty_four_hour.group(3),
+                        twenty_four_hour.group(4),
+                    )
+                )
+
+        return values
+
     async def observed_extreme_so_far(
         self,
         station_id: str,
@@ -73,18 +152,61 @@ class NWSClient:
         timezone_name: str,
         temp_type: TemperatureType,
     ) -> float | None:
-        payload = await self._json(f"https://api.weather.gov/stations/{station_id}/observations")
+        payload = await self._json(
+            f"https://api.weather.gov/stations/{station_id}/observations?limit=500"
+        )
         local_zone = ZoneInfo(timezone_name)
         values: list[float] = []
+
         for feature in payload.get("features", []):
             props = feature.get("properties", {})
             timestamp = props.get("timestamp")
-            celsius = (props.get("temperature") or {}).get("value")
-            if timestamp is None or celsius is None:
+            if timestamp is None:
                 continue
-            observed = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(local_zone)
-            if observed.date() == target_date:
-                values.append(float(celsius) * 9 / 5 + 32)
+
+            observed = datetime.fromisoformat(
+                timestamp.replace("Z", "+00:00")
+            ).astimezone(local_zone)
+
+            # A report just after 00Z can still belong to the prior local date.
+            if observed.date() != target_date:
+                continue
+
+            celsius = (props.get("temperature") or {}).get("value")
+            if celsius is not None:
+                values.append(float(celsius) * 9.0 / 5.0 + 32.0)
+
+            raw_message = props.get("rawMessage") or ""
+
+            # A six-hour extrema group is usable only when the entire
+            # six-hour reporting window lies inside the target local day.
+            local_midnight = observed.replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            hours_since_midnight = (
+                observed - local_midnight
+            ).total_seconds() / 3600.0
+
+            values.extend(
+                self._raw_metar_temperatures(
+                    raw_message,
+                    temp_type,
+                    include_six_hour=hours_since_midnight >= 6.0,
+                    # A rolling 24-hour group can contain the previous
+                    # calendar day's extreme and must not be used for a
+                    # live same-day running maximum or minimum.
+                    include_twenty_four_hour=False,
+                )
+            )
+
         if not values:
             return None
-        return max(values) if temp_type is TemperatureType.HIGH else min(values)
+
+        return (
+            max(values)
+            if temp_type is TemperatureType.HIGH
+            else min(values)
+        )
